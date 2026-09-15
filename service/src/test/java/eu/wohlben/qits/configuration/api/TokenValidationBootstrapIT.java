@@ -139,17 +139,22 @@ public class TokenValidationBootstrapIT {
 
     /**
      * The audience this service enforces, and it is the SHIPPED value: {@code
-     * qits.auth.machine.audience=qits-configuration} is spelled as a literal in {@code
-     * application.properties}, not as an expression over an environment variable, so there is
-     * nothing to feed and overriding it would only test a string this test invented. (qits-githost's
-     * IT hands its process {@code QITS_AUTH_MACHINE_AUDIENCE} precisely because the expression
-     * there reads that variable; the same rollout hit both spellings.) A deployment still overrides
-     * it per environment — the default stays the bare name on purpose, since an
-     * environment-qualified one would bake one tier into an image every tier shares — and {@code
-     * quarkus.oidc.token.audience=${qits.auth.machine.audience}} is what the deny story proves is
-     * really read.
+     * quarkus.oidc.token.audience=qits-platform} is spelled as a literal in {@code
+     * application.properties}, so there is nothing to feed and overriding it would only test a
+     * string this test invented. It is the one value qits-platform-idp stamps onto every token it
+     * mints, whatever the client asked for, which is why every caller — the deployer below as much
+     * as a person's CLI — presents it and the roles decide the rest. The deny story is what proves
+     * the key is read rather than assumed.
      */
-    static final String AUDIENCE = "qits-configuration";
+    static final String PLATFORM_AUDIENCE = "qits-platform";
+
+    /**
+     * An audience that is genuinely not this platform's, which is what the deny story presents. A
+     * peer's name would not do: every token qits-platform-idp mints carries {@code qits-platform},
+     * so a sibling service's bearer is admitted here and its roles decide what it may do. The
+     * refusal this suite can honestly claim is of a token cut for somewhere else entirely.
+     */
+    static final String FOREIGN_AUDIENCE = "some-other-platform";
 
     @Override
     public Map<String, String> getConfigOverrides() {
@@ -170,6 +175,12 @@ public class TokenValidationBootstrapIT {
       // the posture a deployed platform takes, and this story is where it is documented. Flipping
       // the derived key directly would prove the tenant and skip the seam.
       overrides.put("qits.auth.machine.required", "true");
+      // …and what the gate needs beside it. qits-auth-core's MachineAuth refuses to start with the
+      // gate on and no audience configured, and the shipped properties no longer carry one: the
+      // audience a receiver cares about is quarkus.oidc.token.audience, which is a literal there.
+      // So the profile that turns the gate on is the profile that states this, and it states the
+      // same platform audience the tenant enforces.
+      overrides.put("qits.auth.machine.audience", PLATFORM_AUDIENCE);
       // The one seam this test MOVES: where the idp is. A runtime key, so the packaged artifact is
       // otherwise exactly what ships — discovery stays off and `jwks-path=jwks` is joined onto it.
       overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
@@ -259,7 +270,7 @@ public class TokenValidationBootstrapIT {
         .as("jwks-fetched");
 
     // End (b), the configuration side: those keys are what token validation now runs on. A platform
-    // service's bearer (aud = this service, roles in `groups`) opens the guarded store — the
+    // service's bearer (aud = the platform, roles in `groups`) opens the guarded store — the
     // applications listing, which names qits:system beside qits:admin because the deployer and an
     // operator both read this surface.
     //
@@ -269,7 +280,7 @@ public class TokenValidationBootstrapIT {
     String platformToken =
         idp.token()
             .subject(DEPLOYER)
-            .audience(PackagedWithMockIdp.AUDIENCE)
+            .audience(PackagedWithMockIdp.PLATFORM_AUDIENCE)
             .groups("qits:system")
             .mint();
     given()
@@ -279,7 +290,7 @@ public class TokenValidationBootstrapIT {
         .statusCode(200)
         .body("applications", notNullValue());
     story
-        .note("the deployer's bearer (aud=qits-configuration, groups=[qits:system]) opens it")
+        .note("the deployer's bearer (aud=qits-platform, groups=[qits:system]) opens it")
         .as("configuration-served");
   }
 
@@ -289,10 +300,11 @@ public class TokenValidationBootstrapIT {
   @UserStoryDescription(
       """
       The flip side of trusting the platform's keys: a token signed by a key the published JWKS
-      never carried, or minted for another service's audience, is refused at the door — however
-      well-formed it looks. Both are 401 and not 403: the credential never became an identity, so
-      there is no caller to have been forbidden. This service holds what every deployment on the
-      platform is configured from, so it has no anonymous surface and no second door.
+      never carried, or minted for an audience that is not this platform's, is refused at the door —
+      however well-formed it looks. Both are 401 and not 403: the credential never became an
+      identity, so there is no caller to have been forbidden. This service holds what every
+      deployment on the platform is configured from, so it has no anonymous surface and no second
+      door.
       """)
   @Order(2)
   void aStrangersTokenIsRefused(Interactions story) {
@@ -303,7 +315,7 @@ public class TokenValidationBootstrapIT {
 
     String strangersToken =
         idp.token()
-            .audience(PackagedWithMockIdp.AUDIENCE)
+            .audience(PackagedWithMockIdp.PLATFORM_AUDIENCE)
             .groups("qits:system")
             .signedByUnknownKey()
             .mint();
@@ -319,18 +331,21 @@ public class TokenValidationBootstrapIT {
         .note("a token signed by a key the published JWKS never carried is refused")
         .as("unknown-key-refused");
 
-    // The audience half, which is what proves quarkus.oidc.token.audience=${qits.auth.machine.audience}
-    // is read rather than assumed: this token is signed by the very key the JWKS published and is
-    // still refused, because it was cut for somebody else.
+    // The audience half, which is what proves quarkus.oidc.token.audience=qits-platform is read
+    // rather than assumed: this token is signed by the very key the JWKS published and is still
+    // refused, because it was cut for somewhere that is not this platform. A PEER's token would not
+    // do here — qits-platform-idp stamps qits-platform onto every token it mints, so a sibling
+    // service's bearer is admitted and its roles decide what it may do. The audience says which
+    // platform, never which service.
     String wrongAudienceToken =
-        idp.token().audience("some-other-service").groups("qits:system").mint();
+        idp.token().audience(PackagedWithMockIdp.FOREIGN_AUDIENCE).groups("qits:system").mint();
     given()
         .header("Authorization", "Bearer " + wrongAudienceToken)
         .get(GUARDED_ROUTE)
         .then()
         .statusCode(401);
     story
-        .note("a token minted for another service's audience is refused just the same")
+        .note("a token minted for an audience that is not this platform's is refused just the same")
         .as("wrong-audience-refused");
   }
 

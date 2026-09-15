@@ -10,10 +10,10 @@ import io.restassured.specification.RequestSpecification;
  * <h2>A machine is a bearer</h2>
  *
  * <p>{@link #platformService(RequestSpecification, String)} presents an RS256 token minted by {@link
- * MockIdp} against the very JWKS the launched process fetched at startup: {@code
- * aud=qits-configuration} (what {@code qits.auth.machine.audience} pins as a literal in {@code
- * application.properties}) and {@code groups=[qits:system]} — qits-platform-idp copies a client's
- * roles into that claim and quarkus-oidc reads it as roles with no configuration at all.
+ * MockIdp} against the very JWKS the launched process fetched at startup: {@code aud=qits-platform}
+ * (what {@code quarkus.oidc.token.audience} pins as a literal in {@code application.properties}) and
+ * {@code groups=[qits:system]} — qits-platform-idp copies a client's roles into that claim and
+ * quarkus-oidc reads it as roles with no configuration at all.
  *
  * <h2>A person is a pair of headers</h2>
  *
@@ -43,10 +43,12 @@ public final class StoryIdentities {
 
   /**
    * The audience this service enforces. A literal, because {@code application.properties} pins
-   * {@code qits.auth.machine.audience=qits-configuration} as one — there is no environment variable
-   * to feed, and overriding it would only test a string this suite invented.
+   * {@code quarkus.oidc.token.audience=qits-platform} as one — there is no environment variable to
+   * feed, and overriding it would only test a string this suite invented. It is the platform's
+   * audience rather than this service's: qits-platform-idp stamps it onto every token it mints, so
+   * it is what every caller presents and the roles below are what tell them apart.
    */
-  public static final String AUDIENCE = "qits-configuration";
+  public static final String PLATFORM_AUDIENCE = "qits-platform";
 
   /** The machine role a platform peer holds: the deployer's resolved read, the bootstrap's import. */
   public static final String MACHINE_ROLE = "qits:system";
@@ -80,7 +82,7 @@ public final class StoryIdentities {
     return MockIdp.attach()
         .token()
         .subject(subject)
-        .audience(AUDIENCE)
+        .audience(PLATFORM_AUDIENCE)
         .groups(MACHINE_ROLE)
         .mint();
   }
