@@ -365,12 +365,12 @@ class ConfigurationServiceTest {
   void thePinReportMergesWhatIsDeclaredWithWhatIsAuthoredAndOmitsWhatWasNeverReleased() {
     assertTrue(
         configuration.imagePins().isEmpty(),
-        "an environment that has released nothing pins nothing — not four rows with no version");
+        "an environment that has released nothing pins nothing — not a row per mapping with no version");
 
     configuration.upsert(ENV,
         "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", "2026.904.160152", "alice");
     configuration.upsert(ENV,
-        "qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION", "2026.904.160522", "alice");
+        "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", "2026.904.160522", "alice");
 
     assertEquals(
         List.of(
@@ -382,11 +382,10 @@ class ConfigurationServiceTest {
             new ImagePinDto(
                 "qits/workspace",
                 "2026.904.160522",
-                "qits-workspaces",
-                "env.QITS_WORKSPACE_IMAGE_VERSION")),
+                "qits-projects",
+                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
         configuration.imagePins(),
-        "the two unreleased mappings are omitted, and the refinement key of the workspace image is"
-            + " one of them — the image is released, that entry is not written");
+        "both authored mappings, each with the version its entry holds");
 
     // A CONSUMER NOBODY HAS EVER WRITTEN A PIN FOR, arriving through its own declaration: an
     // application says which image its version key carries, and the report answers for it with
@@ -420,8 +419,8 @@ class ConfigurationServiceTest {
             new ImagePinDto(
                 "qits/workspace",
                 "2026.904.160522",
-                "qits-workspaces",
-                "env.QITS_WORKSPACE_IMAGE_VERSION")),
+                "qits-projects",
+                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
         configuration.imagePins(),
         "the declared image joins the authored ones in the one order the contract names — and the"
             + " binary coordinate stays out of a report about container images");
@@ -458,7 +457,11 @@ class ConfigurationServiceTest {
     // deciding what it may delete out of one registry the whole platform shares: a version running
     // in a tier this report did not look at is a tag collected out from under a running container.
     configuration.upsert(
-        OTHER_ENV, "qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION", "2026.905.9", "alice");
+        OTHER_ENV,
+        "qits-projects",
+        "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION",
+        "2026.905.9",
+        "alice");
 
     List<ImagePinDto> across = configuration.imagePins();
     assertTrue(
@@ -466,16 +469,16 @@ class ConfigurationServiceTest {
             new ImagePinDto(
                 "qits/workspace",
                 "2026.904.160522",
-                "qits-workspaces",
-                "env.QITS_WORKSPACE_IMAGE_VERSION")),
+                "qits-projects",
+                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
         "the version one tier holds is kept");
     assertTrue(
         across.contains(
             new ImagePinDto(
                 "qits/workspace",
                 "2026.905.9",
-                "qits-workspaces",
-                "env.QITS_WORKSPACE_IMAGE_VERSION")),
+                "qits-projects",
+                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
         "and so is the version the other tier holds");
 
     // The same version in both tiers is ONE fact about the registry, not two: the wire shape has no

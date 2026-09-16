@@ -28,9 +28,7 @@ class ImagePinsTest {
         List.of(
             new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
             new Pin(
-                "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"),
-            new Pin("qits/workspace", "qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION"),
-            new Pin("qits/workspace-editor", "qits-workspaces", "env.QITS_EDITOR_IMAGE_VERSION")),
+                "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
         ImagePins.ORDERED,
         "the answer's order is sorted, not the order the list happens to be typed in");
   }
@@ -53,13 +51,21 @@ class ImagePinsTest {
   }
 
   /**
-   * The match is a whole-name lookup: {@code qits/workspace-editor} opens with {@code
-   * qits/workspace} and is its own key, with its own single pin.
+   * The match is a whole-name lookup, and the editor is what proves it is not a prefix one.
+   *
+   * <p>{@code qits/workspace-editor} opens with {@code qits/workspace} and has had no pin here since
+   * qits-workspaces moved both image versions into its own pom (2026-09-16). Under a prefix match a
+   * workspace release would therefore now write nothing extra and this would look fine; under the
+   * whole-name match the editor is simply absent, which is the same answer an image nobody pins
+   * gets. Asserting the absence keeps the rule under test after the collision that motivated it
+   * stopped existing.
    */
   @Test
-  void theWorkspaceImageMovesTwoPinsAndTheEditorImageOne() {
-    assertEquals(2, ImagePins.BY_IMAGE.get("qits/workspace").size());
-    assertEquals(1, ImagePins.BY_IMAGE.get("qits/workspace-editor").size());
+  void theWorkspaceImageMovesOnePinAndTheEditorImageNone() {
+    assertEquals(1, ImagePins.BY_IMAGE.get("qits/workspace").size());
+    assertNull(
+        ImagePins.BY_IMAGE.get("qits/workspace-editor"),
+        "the editor's version is qits-workspaces' pom's business now, not configuration's");
     assertNull(ImagePins.BY_IMAGE.get("qits/qits-stt"), "an image we do not pin has no entry");
   }
 

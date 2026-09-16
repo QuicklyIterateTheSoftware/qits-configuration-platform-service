@@ -11,24 +11,26 @@ import java.util.Map;
  *
  * <p>A pin says: when this docker image is released, its version becomes the value of this key on
  * this application — an ordinary configuration entry, which the deployer expands into an environment
- * variable and the application starts its next container from. Three images and four pins today:
+ * variable and the application starts its next container from. Two images and two pins today:
  *
  * <ul>
  *   <li>{@code qits/project-agent} &rarr; {@code env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code
  *       qits-projects}
- *   <li>{@code qits/workspace} &rarr; {@code env.QITS_WORKSPACE_IMAGE_VERSION} on {@code
- *       qits-workspaces}, <b>and</b> {@code env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} on {@code
+ *   <li>{@code qits/workspace} &rarr; {@code env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} on {@code
  *       qits-projects}
- *   <li>{@code qits/workspace-editor} &rarr; {@code env.QITS_EDITOR_IMAGE_VERSION} on {@code
- *       qits-workspaces}
  * </ul>
  *
- * <p><b>Two shapes of sharing, and the list allows both.</b> Several images may land on one
- * application — the workspace and editor pins do — because a pin is keyed by the released image and
- * nothing about the write assumes one entry per application. And one image may land on several
- * applications: {@code qits/workspace} is the toolchain-plus-daemon image that qits-workspaces starts
- * a workspace from and qits-projects starts a refinement container from, so a single release of it
- * has to move two independent keys on two applications.
+ * <p><b>It was four until 2026-09-16</b>, and the two that left are the shape of where this whole
+ * list is going: qits-workspaces stopped taking the workspace and editor image versions from
+ * configuration and now pins them as maven dependencies whose version <em>is</em> the image tag. The
+ * comment beside {@link #AUTHORED} has the account. What is left here is the residual, and it is
+ * still meant to shrink.
+ *
+ * <p><b>One image may still land on several applications</b>, and the list allows it: a pin is keyed
+ * by the released image and nothing about the write assumes one entry per application. {@code
+ * qits/workspace} is the toolchain-plus-daemon image that qits-projects starts a refinement
+ * container from; it used to move a second key on qits-workspaces too, and the mechanism that made
+ * that possible is unchanged even though only one consumer uses it today.
  *
  * <p><b>The key spelling is the env override of the property the consumer reads</b>, not a name
  * invented here. SmallRye maps {@code QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} onto {@code
@@ -121,13 +123,34 @@ public final class ImagePins {
   private static final List<Pin> AUTHORED =
       List.of(
           new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
-          new Pin("qits/workspace", "qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION"),
           // qits-projects starts its refinement containers from the same image
           // (refinementhost/RefinementContainerFactory), so its release moves this key too —
           // formerly qits-projects-service's ci-event-upstream-workspace-daemon.yml.
           new Pin(
-              "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"),
-          new Pin("qits/workspace-editor", "qits-workspaces", "env.QITS_EDITOR_IMAGE_VERSION"));
+              "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"));
+
+  // TWO ROWS LEFT ON 2026-09-16, AND THEY LEFT THE OTHER WAY — not to a declaration, but because
+  // their consumer stopped taking the version from configuration at all:
+  //
+  //   qits/workspace        qits-workspaces  env.QITS_WORKSPACE_IMAGE_VERSION
+  //   qits/workspace-editor qits-workspaces  env.QITS_EDITOR_IMAGE_VERSION
+  //
+  // qits-workspaces now pins both images as MAVEN DEPENDENCIES whose own version is the image tag
+  // (eu.wohlben.qits:qits-workspace-daemon-protocol and :qits-workspace-editor-image), so the
+  // version it starts a container from is a reviewed line in its own pom, gated by its own release
+  // request and proven against the daemon by WorkspaceDaemonPinIT before it ships. Writing it from
+  // here was the defect: a new image reached the next workspace with nothing having tested the
+  // pair, and the entry aged past what the registry still held.
+  //
+  // THIS IS NOT A DECLARATION AND `merge` DOES NOT COVER IT. A declared pin shadows an authored row
+  // for the same (application, key) — that is the ordinary way a row leaves. These two leave with
+  // no successor at all, because the fact moved out of configuration entirely, so removing them
+  // here is the whole of it on this side. The entries they already wrote are not deleted by this
+  // (nothing here deletes an entry, by design); qits-workspaces renamed its override key so the
+  // residue stops being read, and warns at boot while it is still present.
+  //
+  // DO NOT ADD THEM BACK to "keep the pin report complete". The report is about what is
+  // launchable-by-configuration, and these two images are not, any more.
 
   /**
    * Every pin in the answer's order — image, then application, then key — sorted here rather than
@@ -139,10 +162,14 @@ public final class ImagePins {
 
   /**
    * The same pins keyed by the unqualified {@code packageName} qits-ci publishes, which is how a
-   * release is matched: <b>whole and exact, never a prefix</b>. That is load-bearing now that {@code
-   * qits/workspace} and {@code qits/workspace-editor} share an opening — they are two images with
-   * pins of their own, and a prefix match would have a workspace release quietly writing the editor's
-   * key too.
+   * release is matched: <b>whole and exact, never a prefix</b>.
+   *
+   * <p>That rule was arrived at because {@code qits/workspace} and {@code qits/workspace-editor}
+   * share an opening and each had pins of its own, so a prefix match would have had a workspace
+   * release quietly writing the editor's key. The editor has no pin here since 2026-09-16, which
+   * removes the instance and not the rule: matching by prefix is wrong whether or not two current
+   * images happen to collide, and the next pair that shares an opening must not have to rediscover
+   * this.
    */
   public static final Map<String, List<Pin>> BY_IMAGE = byImage();
 

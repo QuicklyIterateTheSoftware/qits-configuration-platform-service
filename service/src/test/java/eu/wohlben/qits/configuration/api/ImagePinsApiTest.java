@@ -69,9 +69,7 @@ class ImagePinsApiTest {
   /** Every mapping of the map, written. Idempotent, so either test may run first. */
   private void pinEveryImage() {
     put("qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", AGENT_VERSION);
-    put("qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION", WORKSPACE_VERSION);
     put("qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", WORKSPACE_VERSION);
-    put("qits-workspaces", "env.QITS_EDITOR_IMAGE_VERSION", EDITOR_VERSION);
   }
 
   private void put(String application, String key, String value) {
@@ -85,9 +83,12 @@ class ImagePinsApiTest {
   }
 
   /**
-   * Four mappings, four rows, in the order the contract names — image, then application, then key —
-   * and {@code qits/workspace} twice, because two applications start it and each holds its own
-   * entry.
+   * Every mapping is a row, in the order the contract names — image, then application, then key.
+   *
+   * <p>It was four rows until 2026-09-16, when qits-workspaces stopped taking the workspace and
+   * editor image versions from configuration and started pinning them as maven dependencies of its
+   * own. Two rows left with it, and the one that still names {@code qits/workspace} is qits-projects'
+   * refinement container — which is why the image is still here at all.
    */
   @Test
   void everyConfiguredImageVersionIsARowInTheMapsOrder() {
@@ -100,7 +101,7 @@ class ImagePinsApiTest {
         .statusCode(200)
         // An ISO instant rather than an epoch number: a receipt quotes when it asked.
         .body("generatedAt", endsWith("Z"))
-        .body("pins.size()", equalTo(4))
+        .body("pins.size()", equalTo(2))
         .body("pins[0].image", equalTo("qits/project-agent"))
         .body("pins[0].version", equalTo(AGENT_VERSION))
         .body("pins[0].application", equalTo("qits-projects"))
@@ -109,20 +110,21 @@ class ImagePinsApiTest {
         .body("pins[1].version", equalTo(WORKSPACE_VERSION))
         .body("pins[1].application", equalTo("qits-projects"))
         .body("pins[1].key", equalTo("env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"))
-        .body("pins[2].image", equalTo("qits/workspace"))
-        .body("pins[2].version", equalTo(WORKSPACE_VERSION))
-        .body("pins[2].application", equalTo("qits-workspaces"))
-        .body("pins[2].key", equalTo("env.QITS_WORKSPACE_IMAGE_VERSION"))
-        .body("pins[3].image", equalTo("qits/workspace-editor"))
-        .body("pins[3].version", equalTo(EDITOR_VERSION))
-        .body("pins[3].application", equalTo("qits-workspaces"))
-        .body("pins[3].key", equalTo("env.QITS_EDITOR_IMAGE_VERSION"));
+        // AND NOTHING FOR qits-workspaces. The entries it used to be handed may well still exist —
+        // nothing here deletes one — but they are no longer MAPPED, so they are not launchable-by-
+        // configuration and the report must not claim them.
+        .body("pins.application", everyItem(not(equalTo("qits-workspaces"))));
   }
 
   /**
    * A mapping with nothing stored is omitted rather than answered with a blank version: the image
-   * has never been released into this environment, and a row naming {@code qits/workspace-editor:}
+   * has never been released into this environment, and a row naming {@code qits/project-agent:}
    * would be a tag that cannot exist.
+   *
+   * <p>Told against the agent pin since 2026-09-16. It used to be told against the editor's, which
+   * was the natural choice while that was the one image most likely to be genuinely unreleased —
+   * and the editor has no mapping at all now, so deleting its entry would prove nothing about
+   * omission. The property is the mapping's, not any particular image's.
    */
   @Test
   void aMappingWithNothingStoredHasNoRow() {
@@ -132,9 +134,9 @@ class ImagePinsApiTest {
         .when()
         .delete(
             BASE
-                + "/applications/qits-workspaces/envs/"
+                + "/applications/qits-projects/envs/"
                 + ENV
-                + "/entries/env.QITS_EDITOR_IMAGE_VERSION")
+                + "/entries/env.QITS_PROJECTS_AGENT_IMAGE_VERSION")
         .then()
         .statusCode(204);
 
@@ -143,11 +145,11 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(3))
-        .body("pins.image", everyItem(not(equalTo("qits/workspace-editor"))));
+        .body("pins.size()", equalTo(1))
+        .body("pins.image", everyItem(not(equalTo("qits/project-agent"))));
 
-    // Put it back: the other test asserts all four, and the suite shares one database.
-    put("qits-workspaces", "env.QITS_EDITOR_IMAGE_VERSION", EDITOR_VERSION);
+    // Put it back: the other test asserts the whole list, and the suite shares one database.
+    put("qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", AGENT_VERSION);
   }
 
   /**
@@ -185,7 +187,7 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(5))
+        .body("pins.size()", equalTo(3))
         // qits/api-declared sorts ahead of every authored image, so the declared row is first — one
         // order over the merged list, not the authored ones followed by the declared ones.
         .body("pins[0].image", equalTo("qits/api-declared"))
@@ -210,7 +212,7 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(4))
+        .body("pins.size()", equalTo(2))
         .body(
             "pins.image",
             everyItem(not(equalTo("qits/api-declared"))));

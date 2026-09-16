@@ -3,6 +3,7 @@ package eu.wohlben.qits.configuration.bus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.configuration.control.ConfigurationService;
@@ -189,18 +190,30 @@ class SoftwareReleaseListenerTest {
   }
 
   /**
-   * THE HALF-ADOPTED CONSUMER, which is the state every consumer passes through: qits-workspaces has
-   * declared the key the workspace image moves, and qits-projects — which starts a refinement
-   * container from the same image — has not. So one release writes both pairs and writes each of them
-   * ONCE: the declaration shadows the authored row holding its pair rather than adding a second write
-   * of the same entry, and the authored row nobody has declared survives untouched.
+   * THE HALF-ADOPTED CONSUMER, which is the state every consumer passes through.
+   *
+   * <p>Two declarations for one image: one naming the same (application, key) the authored list
+   * already holds — qits-projects' refinement container — and one naming a pair nothing here
+   * authors. So one release writes both pairs and writes each of them ONCE: the first declaration
+   * shadows the authored row rather than adding a second write of the same entry, and the authored
+   * row is not lost to the other pair being declared.
+   *
+   * <p>It used to be told with qits-workspaces as the declaring half and qits-projects as the
+   * authored one, which stopped composing on 2026-09-16: qits-workspaces' rows left the authored
+   * list entirely, so there was no longer a shadowed pair and an un-shadowed one among the workspace
+   * image's own pins. The property under test did not change — only the pair standing in for the
+   * consumer that has adopted.
    */
   @Test
   void aDeclarationShadowsTheAuthoredPinForItsOwnPairAndOnlyThatOne() {
     CapturingService service =
         new CapturingService()
             .declaring(
-                "docker", "qits/workspace", "qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION");
+                "docker",
+                "qits/workspace",
+                "qits-projects",
+                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")
+            .declaring("docker", "qits/workspace", "qits-sandbox", "env.QITS_SANDBOX_IMAGE_VERSION");
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("docker", "qits/workspace", VERSION);
 
@@ -209,16 +222,16 @@ class SoftwareReleaseListenerTest {
     assertEquals(
         2,
         service.writes.size(),
-        "the declared pair and the authored one, each written once — a declaration replaces the"
-            + " authored row for its pair rather than joining it");
-    assertEquals(
-        1,
-        service.on("qits-workspaces", "env.QITS_WORKSPACE_IMAGE_VERSION").size(),
-        "the pair both halves name is one entry and one write");
+        "the shadowed pair and the purely declared one, each written once — a declaration replaces"
+            + " the authored row for its pair rather than joining it");
     assertEquals(
         1,
         service.on("qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION").size(),
-        "the pair only the authored list names must not be lost to the other one being declared");
+        "the pair both halves name is one entry and one write");
+    assertEquals(
+        1,
+        service.on("qits-sandbox", "env.QITS_SANDBOX_IMAGE_VERSION").size(),
+        "the pair only the declaration names must be written too");
   }
 
   // ------------------------------------------------------------ the fan-out
@@ -269,14 +282,21 @@ class SoftwareReleaseListenerTest {
   }
 
   /**
-   * The workspace image is the one with two consumers: qits-workspaces starts a workspace from it and
-   * qits-projects starts a refinement container from it. So one release is <b>two</b> entries, on two
-   * applications, under the env key each of them reads — and the second of those replaced
-   * qits-projects-service's {@code ci-event-upstream-workspace-daemon.yml}, which used to carry the
-   * same follow by rewriting a property and releasing that service.
+   * The workspace image moves ONE pin now: qits-projects' refinement container.
+   *
+   * <p>It moved two until 2026-09-16 — qits-workspaces read the other one — and that second write is
+   * what this ticket removed: qits-workspaces pins the image as a maven dependency whose version is
+   * the tag, so the version it starts a container from is a line in its own pom rather than an entry
+   * written underneath it. The surviving write replaced qits-projects-service's {@code
+   * ci-event-upstream-workspace-daemon.yml}, which used to carry the same follow by rewriting a
+   * property and releasing that service.
+   *
+   * <p><b>The absence is asserted, not merely unmentioned.</b> A write to qits-workspaces reappearing
+   * here is the defect coming back, and it would come back silently: the entry would simply start
+   * being rewritten again and the version qits-workspaces tested would stop being the one it starts.
    */
   @Test
-  void workspaceImageReleaseWritesBothPins() {
+  void workspaceImageReleaseWritesOnlyTheRefinementPin() {
     CapturingService service = new CapturingService();
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("docker", "qits/workspace", VERSION);
@@ -284,40 +304,40 @@ class SoftwareReleaseListenerTest {
     assertTrue(listener.selects(frame));
     listener.onFrame(frame);
 
-    assertEquals(2, service.writes.size(), "the workspace image moves two pins, not one");
-
-    Write workspaces = service.on("qits-workspaces");
-    assertNotNull(workspaces, "the application that starts a workspace must be pinned");
-    assertEquals(ENV, workspaces.env());
-    assertEquals("env.QITS_WORKSPACE_IMAGE_VERSION", workspaces.key());
-    assertEquals(VERSION, workspaces.value());
+    assertEquals(1, service.writes.size(), "the workspace image moves one pin now, not two");
 
     Write projects = service.on("qits-projects");
-    assertNotNull(projects, "the application that starts a refinement container must be pinned too");
+    assertNotNull(projects, "the application that starts a refinement container must be pinned");
+    assertEquals(ENV, projects.env());
     // The env override of qits.projects.refinement-image-version, which
     // refinementhost/RefinementContainerFactory reads to compose the image it starts.
     assertEquals("env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", projects.key());
     assertEquals(VERSION, projects.value());
+
+    assertNull(
+        service.on("qits-workspaces"),
+        "qits-workspaces takes this version from its own pom; writing it here is the retired defect");
   }
 
   /**
-   * The editor image lands on the same application as the workspace image, under a key of its own —
-   * and its name opens with the workspace image's, so this is also the assertion that the match is a
-   * whole-name lookup rather than a prefix. The single write is the sharper half of that: a prefix
-   * match would give the editor release the workspace's pins.
+   * The editor image moves nothing, and its name is what keeps the whole-name match under test.
+   *
+   * <p>{@code qits/workspace-editor} opens with {@code qits/workspace}, so a prefix match would hand
+   * an editor release the workspace image's pins. It has no mapping of its own since qits-workspaces
+   * started pinning it in its pom, which makes this the strongest form of that assertion: the
+   * correct answer is no write at all, and a prefix match would produce one.
    */
   @Test
-  void workspaceEditorImageReleaseWritesTheEditorPin() {
+  void workspaceEditorImageReleaseWritesNothing() {
     CapturingService service = new CapturingService();
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("docker", "qits/workspace-editor", VERSION);
 
     listener.onFrame(frame);
 
-    Write write = service.only();
-    assertEquals("qits-workspaces", write.application());
-    assertEquals("env.QITS_EDITOR_IMAGE_VERSION", write.key());
-    assertEquals(VERSION, write.value());
+    assertTrue(
+        service.writes.isEmpty(),
+        () -> "the editor image is pinned by nothing here; wrote " + service.writes);
   }
 
   // ------------------------------------------------------------ what moves nothing
