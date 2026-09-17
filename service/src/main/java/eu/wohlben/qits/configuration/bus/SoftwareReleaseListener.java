@@ -23,7 +23,10 @@ import org.jboss.logging.Logger;
  * package each key carries a version of; {@link ConfigurationService#declaredPins} is that question
  * asked backwards — who declared THIS coordinate — restricted to the declaration each application
  * currently stands behind. The second half is {@link ImagePins#BY_IMAGE}, the residual list of pins
- * still carried by hand for consumers that have not declared yet. {@link ImagePins#merge} puts the
+ * still carried by hand for consumers that have not declared yet — <b>empty since 2026-09-17</b>, so
+ * every write this listener makes today comes from a declaration. It is still asked, and must be:
+ * the list is a residual rather than a retired mechanism, and the next consumer that cannot declare
+ * lands in it. {@link ImagePins#merge} puts the
  * two together with declarations winning per (application, key), and {@code
  * ConfigurationService.imagePins} reports through the same function — so the pin mechanism and the
  * pin report cannot disagree about which half won.
@@ -67,9 +70,11 @@ import org.jboss.logging.Logger;
  * authored side, an indexed equality on the declared one. The case that established it was {@code
  * qits/workspace} and {@code qits/workspace-editor}, which share an opening and each had pins of
  * their own, so a release of either would have moved the other's keys under a prefix match. Neither
- * is pinned here any more — both consumers took the version into their own poms in September 2026 —
- * and the rule outlives them: a released name that merely opens with a pinned image's name is a
- * different image, whether or not two images in the list happen to collide this month.
+ * is pinned here any more — both consumers took the version into their own poms in September 2026,
+ * and so did every other authored row — and the rule outlives them: a released name that merely
+ * opens with a pinned image's name is a different image, whether or not two images happen to collide
+ * this month. With the authored map empty it can only be EXERCISED on the declared side now, which
+ * is where SoftwareReleaseListenerTest holds it.
  *
  * <h2>THE FAN-OUT: one write per env, because an entry is an override</h2>
  *
@@ -124,8 +129,10 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
    * means something else.
    *
    * <p><b>It under-describes this listener on purpose, and by a wider margin every wave.</b> It was
-   * named for one image; it now covers every declared coordinate on the platform. Reading it as a
-   * description and "fixing" it is the one change that cannot be undone by a redeploy: a new id has
+   * named for one image; it now covers every declared coordinate on the platform, and since
+   * 2026-09-17 it does not cover {@code qits/project-agent} at all — qits-projects takes that
+   * version from a maven dependency of its own, so the one image this key still names is the one
+   * image this listener no longer pins. Reading it as a description and "fixing" it is the one change that cannot be undone by a redeploy: a new id has
    * no watermark, initializes at the head of the log and settles every release in between as though
    * it had been handled. The name is a key. Leave it alone.
    */

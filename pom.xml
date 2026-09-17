@@ -84,8 +84,8 @@
              — the same-string policy applies the day this repo consumes a newer reactor of it. -->
         <qits.service-mock.version>2026.917.65806</qits.service-mock.version>
         <!-- The platform event bus client (qits-eventstream). This service SUBSCRIBES: it consumes
-             qits-ci's `SoftwareRelease` off the durable bus and, for the project-agent image, writes
-             the released version into its own config store. The eventstream jar brings the outbox
+             qits-ci's `SoftwareRelease` off the durable bus and, for a coordinate some application
+             declared, writes the released version into its own config store. The eventstream jar brings the outbox
              datasource, the durable-consumer tables and the catch-up sweeper; the payload is decoded
              into a local record (bus/SoftwareReleaseListener), so no qits-ci module is on the path. -->
         <qits.eventstream.version>2026.917.70940</qits.eventstream.version>

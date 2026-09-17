@@ -16,12 +16,16 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 /**
  * The configured container-image versions: what a container launch on this platform would pull.
  *
- * <p>One row per {@code control/ImagePins} mapping that has a stored version — the image, the
- * version, and the entry it was read from. It is a projection of entries a caller could read one at
- * a time through {@code /applications/{app}/entries}; what it adds is <b>the map</b>, which lives in
- * this service and nowhere else, so the caller does not have to know that {@code
- * env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code qits-projects} is a version of {@code
- * qits/project-agent}.
+ * <p>One row per mapping that has a stored version — the image, the version, and the entry it was
+ * read from. It is a projection of entries a caller could read one at a time through {@code
+ * /applications/{app}/entries}; what it adds is <b>the map</b>, which lives in this service and
+ * nowhere else, so the caller does not have to know which image a given key on a given application
+ * carries a version of.
+ *
+ * <p>The mappings come from the applications' own {@code packageVersion} declarations and from
+ * {@code control/ImagePins}, the residual list of pins carried by hand — empty since 2026-09-17, so
+ * every row in this answer is declared today. {@code ImagePins.merge} is where the two halves meet,
+ * so this report cannot disagree with the listener about which of them won.
  *
  * <p><b>Who reads it, and why an access timestamp will not do.</b> qits-artifacts' garbage collector
  * takes this as a pin source when it decides which images it may delete. A configured version is one

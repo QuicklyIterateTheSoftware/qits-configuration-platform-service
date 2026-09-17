@@ -64,7 +64,7 @@ navigation-entries: services.details.Configuration:7, daemons.details.Configurat
 
 # TWO STORES, DECLARED RATHER THAN CONFIGURED. This deployable now joins two jars that each own a
 # store: the configuration jar, and qits-eventstream (this service consumes the SoftwareRelease
-# event to track the project-agent image version). Each entry is a role and a database of its own on
+# event to track the package versions applications declare). Each entry is a role and a database of its own on
 # the tier's postgres, created before the successor container starts and injected as
 # QITS_RESOURCE_<NAME>_URL / _USERNAME / _PASSWORD — the generic contract each jar's datasource reads.
 # The NAMES are not free: `db` is what the configuration jar reads, `eventstream` is what the

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import eu.wohlben.qits.configuration.control.ImagePins.Pin;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -16,19 +17,37 @@ import org.junit.jupiter.api.Test;
  * list, and the reported order has to be the one the contract names.
  *
  * <p>And since the authored list stopped being the whole answer, {@link ImagePins#merge} is here too
- * — the one function that decides which of a declared pin and an authored one wins. It is asserted
- * against the real authored list rather than a fixture, because the case worth proving is a real
- * consumer adopting declarations one key at a time.
+ * — the one function that decides which of a declared pin and an authored one wins.
+ *
+ * <p><b>THE AUTHORED LIST IS EMPTY as of 2026-09-17, and that changed what these tests can be
+ * written against.</b> They used to take the real authored rows as their fixture, which was the
+ * better test while there were any: a real consumer adopting declarations one key at a time is the
+ * case worth proving. There is no real row left to take, so the merge cases below are written
+ * against SYNTHETIC authored pins passed straight into {@code merge}. That is not a weakening of
+ * what is asserted — {@code merge} takes both halves as arguments and has never read {@link
+ * ImagePins#ORDERED} itself — but it is the reason a reader will not find the platform's own names
+ * in them. The one thing asserted about the real list is that it is empty and that both views agree
+ * about it.
  */
 class ImagePinsTest {
 
+  /**
+   * NOTHING IS PINNED BY HAND ANY MORE, and this is the assertion that says so out loud.
+   *
+   * <p>It is worth a test rather than a comment because an empty list is exactly what a careless
+   * edit produces by accident, and because the opposite — a row quietly reappearing — is one of the
+   * retired defects coming back: a release would start rewriting an entry its consumer renamed away
+   * from, and qits-artifacts would be told to protect a tag on the strength of it. Adding a row is a
+   * legitimate change (see the class javadoc: an empty list is not a retired mechanism), and this
+   * test failing is how that change announces itself for review rather than landing unread.
+   */
   @Test
-  void theOrderIsImageThenApplicationThenKey() {
+  void nothingIsAuthoredByHandAndBothViewsSayTheSame() {
     assertEquals(
-        List.of(
-            new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
+        List.of(),
         ImagePins.ORDERED,
-        "the answer's order is sorted, not the order the list happens to be typed in");
+        "every image pin on this platform is declared by its application now");
+    assertEquals(Map.of(), ImagePins.BY_IMAGE, "and the listener has nothing to match against");
   }
 
   /**
@@ -49,28 +68,21 @@ class ImagePinsTest {
   }
 
   /**
-   * The match is a whole-name lookup, held against the one image that is still pinned.
+   * The absence of the images that have left, which is a different claim from the rule about how a
+   * name is matched.
    *
-   * <p>The pair that motivated the rule — {@code qits/workspace} and {@code qits/workspace-editor},
-   * which share an opening and each had pins of their own — has left the list entirely: the editor's
-   * row on 2026-09-16 with qits-workspaces, the workspace image's last row on 2026-09-17 with
-   * qits-projects' refinement container. Asserting their absence is still worth doing (a row
-   * reappearing is the retired defect coming back) but it no longer EXERCISES the rule, because a
-   * prefix implementation would find nothing to match either.
-   *
-   * <p>So the rule is exercised against {@code qits/project-agent} instead. {@code
-   * qits/project-agent-next} opens with it and is a different image; under a prefix match it would
-   * be handed the agent's pin, and under the whole-name match it is simply absent — the same answer
-   * an image nobody pins gets. The name is synthetic on purpose: the point is the lookup, and
-   * waiting for two real images to collide again is how a platform rediscovers this defect.
+   * <p><b>The whole-name rule is no longer exercisable here and the javadoc on {@link
+   * ImagePins#BY_IMAGE} says where it lives now</b>: an empty map answers nothing to a prefix lookup
+   * and to a whole-name one alike, so a test here would pass under either implementation. What is
+   * still worth holding is that these four names find nothing — each one is a row that left because
+   * its consumer pins the image in its own pom, and each one reappearing is the retired defect
+   * coming back.
    */
   @Test
-  void theMatchIsTheWholeImageNameAndNeverAPrefixOfIt() {
-    assertEquals(1, ImagePins.BY_IMAGE.get("qits/project-agent").size());
+  void theImagesThatLeftArePinnedByNothingHere() {
     assertNull(
-        ImagePins.BY_IMAGE.get("qits/project-agent-next"),
-        "a name that merely opens with a pinned image's name is not that image");
-
+        ImagePins.BY_IMAGE.get("qits/project-agent"),
+        "the agent image is qits-projects' pom's business now, proven by ProjectAgentDaemonPinIT");
     assertNull(
         ImagePins.BY_IMAGE.get("qits/workspace"),
         "the workspace image is pinned by nothing here; its last consumer pins it in its own pom");
@@ -82,11 +94,33 @@ class ImagePinsTest {
 
   // ------------------------------------------------------------ the merge
 
+  /**
+   * The authored half of every merge case below. Synthetic, because {@link ImagePins#AUTHORED} is
+   * empty — see the class javadoc for why that is the honest fixture rather than a shortcut. The
+   * names are shaped like the rows that used to be here so the cases still read as the thing they
+   * model: an application carried by hand while it adopts declarations one key at a time.
+   */
+  private static final List<Pin> AUTHORED_FIXTURE =
+      List.of(new Pin("qits/sample-agent", "qits-sample", "env.QITS_SAMPLE_AGENT_IMAGE_VERSION"));
+
   /** With nothing declared, the answer is exactly the authored list — the platform as it was. */
   @Test
   void nothingDeclaredLeavesTheAuthoredListAsItIs() {
     assertEquals(List.of(), ImagePins.merge(List.of(), List.of()));
-    assertEquals(ImagePins.ORDERED, ImagePins.merge(List.of(), ImagePins.ORDERED));
+    assertEquals(AUTHORED_FIXTURE, ImagePins.merge(List.of(), AUTHORED_FIXTURE));
+  }
+
+  /**
+   * And with the platform's real authored list — empty — a declared set is the whole answer,
+   * untouched. That is the state every pin on this platform is in today, so it is asserted directly
+   * rather than left to follow from the fixture cases.
+   */
+  @Test
+  void withNothingAuthoredTheDeclaredSetIsTheWholeAnswer() {
+    List<Pin> declared =
+        List.of(new Pin("qits/stt", "qits-stt", "env.QITS_STT_VERSION"));
+
+    assertEquals(declared, ImagePins.merge(declared, ImagePins.ORDERED));
   }
 
   /**
@@ -100,19 +134,17 @@ class ImagePinsTest {
   @Test
   void aDeclaredPinShadowsTheAuthoredRowForItsOwnPair() {
     Pin declared =
-        new Pin("qits/project-agent-next", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION");
+        new Pin("qits/sample-agent-next", "qits-sample", "env.QITS_SAMPLE_AGENT_IMAGE_VERSION");
 
-    List<Pin> merged = ImagePins.merge(List.of(declared), ImagePins.ORDERED);
+    List<Pin> merged = ImagePins.merge(List.of(declared), AUTHORED_FIXTURE);
 
     assertEquals(
-        ImagePins.ORDERED.size(),
+        AUTHORED_FIXTURE.size(),
         merged.size(),
         "a declaration of a pair already authored is a replacement, not an addition");
     assertTrue(merged.contains(declared), "the declared row is the one that survives");
     assertFalse(
-        merged.contains(
-            new Pin(
-                "qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
+        merged.containsAll(AUTHORED_FIXTURE),
         "and the authored row it shadows is gone, image and all");
   }
 
@@ -120,25 +152,16 @@ class ImagePinsTest {
    * Shadowing is per PAIR, not per application: a half-adopted consumer has declared one of its keys
    * and is still carried by hand on another, and the one it has not declared must not disappear with
    * the one it has.
-   *
-   * <p>The declared pair is a synthetic second key on the real application, and has to be: since
-   * 2026-09-17 qits-projects has exactly ONE authored row, so there is no second real key of its own
-   * to declare. Inventing the key rather than the application is what keeps the case honest — the
-   * property is about two pairs of one application meeting {@link ImagePins#merge}, and the authored
-   * half of it is the real row.
    */
   @Test
   void anApplicationThatDeclaresOneKeyKeepsTheAuthoredRowForItsOther() {
-    Pin declared =
-        new Pin("qits/sandbox", "qits-projects", "env.QITS_PROJECTS_SANDBOX_IMAGE_VERSION");
+    Pin declared = new Pin("qits/sample-box", "qits-sample", "env.QITS_SAMPLE_BOX_IMAGE_VERSION");
 
-    List<Pin> merged = ImagePins.merge(List.of(declared), ImagePins.ORDERED);
+    List<Pin> merged = ImagePins.merge(List.of(declared), AUTHORED_FIXTURE);
 
     assertTrue(merged.contains(declared));
     assertTrue(
-        merged.contains(
-            new Pin(
-                "qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
+        merged.containsAll(AUTHORED_FIXTURE),
         "the same application's undeclared key is still pinned by hand");
   }
 
@@ -153,7 +176,7 @@ class ImagePinsTest {
             new Pin("qits/stt", "qits-stt", "env.QITS_STT_VERSION"),
             new Pin("qits/build-agent", "qits-ci", "env.QITS_CI_BUILD_AGENT_VERSION"));
 
-    List<Pin> merged = ImagePins.merge(declared, ImagePins.ORDERED);
+    List<Pin> merged = ImagePins.merge(declared, AUTHORED_FIXTURE);
 
     assertEquals(
         merged.stream()
@@ -164,7 +187,7 @@ class ImagePinsTest {
             .toList(),
         merged,
         "image, then application, then key — across both halves at once");
-    assertEquals(ImagePins.ORDERED.size() + declared.size(), merged.size());
+    assertEquals(AUTHORED_FIXTURE.size() + declared.size(), merged.size());
   }
 
   @Test

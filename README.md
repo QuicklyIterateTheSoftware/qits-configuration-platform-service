@@ -144,7 +144,8 @@ environment — the one named in the path of the read.
 image, then application, then key. An image appears twice when two applications start it — the shape
 allows it, though no mapping uses it today; `qits/workspace` was the example until the last
 application reading it from configuration moved the version into its own pom — or when two envs hold
-different versions of it; a mapping with nothing stored anywhere is
+different versions of it. Every mapping the report answers for is now a **declared** one:
+`control/ImagePins` has carried no row since 2026-09-17. A mapping with nothing stored anywhere is
 **omitted**, because an image nobody has released here has no version to name. An empty `pins` is an
 ordinary 200.
 

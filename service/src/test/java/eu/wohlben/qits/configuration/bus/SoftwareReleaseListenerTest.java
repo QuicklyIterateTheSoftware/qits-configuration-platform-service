@@ -190,24 +190,23 @@ class SoftwareReleaseListenerTest {
   }
 
   /**
-   * THE HALF-ADOPTED CONSUMER, which is the state every consumer passes through.
+   * ONE IMAGE, TWO CONSUMERS, TWO DECLARED PAIRS — and each written exactly once.
    *
-   * <p>Two declarations for one image: one naming the same (application, key) the authored list
-   * already holds — qits-projects' project agent — and one naming a pair nothing here authors. So
-   * one release writes both pairs and writes each of them ONCE: the first declaration shadows the
-   * authored row rather than adding a second write of the same entry, and the authored row is not
-   * lost to the other pair being declared.
+   * <p>This was THE HALF-ADOPTED CONSUMER for as long as there was an authored row to be half
+   * adopted: one declaration naming the same (application, key) {@link ImagePins} already held, one
+   * naming a pair nothing authored, and the property was that the first shadowed rather than
+   * doubled. It has been retold three times as the authored list shrank under it, and on 2026-09-17
+   * that list reached ZERO — so there is no authored row left for a declaration to shadow, and the
+   * case degenerates honestly into the fan-out across two declared pairs of one image.
    *
-   * <p>It has been retold twice as the authored list shrank under it, and the property never moved —
-   * only the pair standing in for the consumer that has adopted. It was qits-workspaces declaring
-   * and qits-projects authored until 2026-09-16; then the workspace image's refinement row until
-   * 2026-09-17, when that row left too and took the last image with two pins with it. It is told
-   * against {@code qits/project-agent} now because that is the only authored row there is, which is
-   * also why the un-shadowed half has to be a declared-only pair: there is no second authored row to
-   * leave standing.
+   * <p><b>The shadowing rule itself has not stopped being tested; it has moved to where merge() can
+   * still be handed both halves</b> — {@code ImagePinsTest.aDeclaredPinShadowsTheAuthoredRowForItsOwnPair},
+   * against a synthetic authored pin. Do not read its absence here as the rule lapsing: the merge
+   * this listener calls is the real one, and the day a row is typed into {@code AUTHORED} again this
+   * test is where it should be retold once more.
    */
   @Test
-  void aDeclarationShadowsTheAuthoredPinForItsOwnPairAndOnlyThatOne() {
+  void oneImageDeclaredByTwoConsumersWritesEachPairOnce() {
     CapturingService service =
         new CapturingService()
             .declaring(
@@ -222,19 +221,15 @@ class SoftwareReleaseListenerTest {
 
     listener.onFrame(frame);
 
-    assertEquals(
-        2,
-        service.writes.size(),
-        "the shadowed pair and the purely declared one, each written once — a declaration replaces"
-            + " the authored row for its pair rather than joining it");
+    assertEquals(2, service.writes.size(), "each declared pair, written once");
     assertEquals(
         1,
         service.on("qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION").size(),
-        "the pair both halves name is one entry and one write");
+        "one pair is one entry and one write");
     assertEquals(
         1,
         service.on("qits-sandbox", "env.QITS_SANDBOX_IMAGE_VERSION").size(),
-        "the pair only the declaration names must be written too");
+        "and the second consumer of the same image is not lost to the first");
   }
 
   // ------------------------------------------------------------ the fan-out
@@ -246,7 +241,16 @@ class SoftwareReleaseListenerTest {
    */
   @Test
   void aPinIsWrittenIntoEveryEnvTheStoreKnowsAbout() {
-    CapturingService service = new CapturingService();
+    // Told against a DECLARED pin since 2026-09-17, because there is no authored one left to tell it
+    // against. The fan-out is the listener's and happens after merge(), so which half the pair came
+    // out of decides nothing here.
+    CapturingService service =
+        new CapturingService()
+            .declaring(
+                "docker",
+                "qits/project-agent",
+                "qits-projects",
+                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION");
     service.envs = List.of(ENV, OTHER_ENV);
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("docker", "qits/project-agent", VERSION);
@@ -267,21 +271,38 @@ class SoftwareReleaseListenerTest {
 
   // ------------------------------------------------------------ the authored residual
 
+  /**
+   * THE AUTHORED RESIDUAL IS EMPTY, so an image is pinned by its application's declaration or by
+   * nothing.
+   *
+   * <p>This test used to be the authored half's own proof — {@code qits/project-agent} was the last
+   * row and a release of it wrote that entry. qits-projects pins the image in its own pom now
+   * ({@code eu.wohlben.qits:qits-projects-daemon-protocol}, whose version IS the tag, proven by
+   * ProjectAgentDaemonPinIT), so the row left on 2026-09-17 and there is no authored pin on this
+   * platform at all.
+   *
+   * <p><b>What it asserts instead is the thing worth failing on</b>: that the list really is empty,
+   * and that a docker release of the name that was last in it moves nothing. A row reappearing would
+   * come back silently — the entry would simply start being rewritten, and the version qits-projects
+   * tested would stop being the one it starts.
+   */
   @Test
-  void anImageNobodyHasDeclaredStillFollowsTheAuthoredList() {
+  void nothingIsAuthoredSoAnUndeclaredImageMovesNothing() {
+    assertEquals(
+        List.of(), ImagePins.ORDERED, "every image pin is declared by its application now");
+
     CapturingService service = new CapturingService();
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("docker", "qits/project-agent", VERSION);
 
-    assertTrue(listener.selects(frame), "the project-agent docker image must be acted on");
+    assertTrue(listener.selects(frame), "a well-formed release is claimed and decided inside");
     listener.onFrame(frame);
 
-    Write write = service.only();
-    assertEquals(ENV, write.env());
-    assertEquals("qits-projects", write.application());
-    assertEquals("env.QITS_PROJECTS_AGENT_IMAGE_VERSION", write.key());
-    assertEquals(VERSION, write.value());
-    assertEquals(ACTOR, write.actor());
+    assertEquals(
+        List.of(),
+        service.writes,
+        "the agent image's version is qits-projects' pom's business; writing"
+            + " env.QITS_PROJECTS_AGENT_IMAGE_VERSION here is the retired defect");
   }
 
   /**
@@ -328,7 +349,7 @@ class SoftwareReleaseListenerTest {
    * frame no longer exercises that rule — a prefix implementation would find nothing to match
    * either — and it is kept for what it still proves: a released image nothing maps writes nothing,
    * told against the two names most likely to be added back by mistake. The prefix rule itself is
-   * exercised below, against the image that IS still pinned.
+   * exercised below, against a DECLARED pin, which is where every live pin is now.
    */
   @Test
   void workspaceEditorImageReleaseWritesNothing() {
@@ -344,22 +365,33 @@ class SoftwareReleaseListenerTest {
   }
 
   /**
-   * THE WHOLE-NAME MATCH, held against the one image that is still pinned.
+   * THE WHOLE-NAME MATCH, held against a DECLARED pin — which is where every live pin is now.
    *
    * <p>A release of {@code qits/project-agent-next} must write nothing: it opens with {@code
    * qits/project-agent}, and a prefix match would hand it that image's pin — an entry pinning the
    * agent's container to a tag from a different image's release, which is exactly how a container
    * ends up starting on a tag that does not exist.
    *
-   * <p>The name is synthetic, and has to be: the two real images that shared an opening
-   * ({@code qits/workspace} and {@code qits/workspace-editor}) both left this list in September
-   * 2026, so asserting against them proves nothing about the lookup any more. The rule outlives the
-   * collision that found it, and waiting for two real images to collide again is how a platform
-   * rediscovers a defect it has already paid for.
+   * <p><b>The authored side can no longer host this assertion and that is why it moved.</b> {@link
+   * ImagePins#BY_IMAGE} is empty since 2026-09-17, and an empty map answers nothing to a prefix
+   * lookup and to a whole-name one alike — a test there would pass under either implementation. The
+   * declared side is an indexed equality on (type, name) and is a real lookup with a real row in it,
+   * so this is the same rule exercised in its surviving home.
+   *
+   * <p>The {@code …-next} name is synthetic, and has to be: the two real images that shared an
+   * opening ({@code qits/workspace} and {@code qits/workspace-editor}) both left in September 2026.
+   * The rule outlives the collision that found it, and waiting for two real images to collide again
+   * is how a platform rediscovers a defect it has already paid for.
    */
   @Test
   void aReleaseWhoseNameMerelyOpensWithAPinnedImagesWritesNothing() {
-    CapturingService service = new CapturingService();
+    CapturingService service =
+        new CapturingService()
+            .declaring(
+                "docker",
+                "qits/project-agent",
+                "qits-projects",
+                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION");
     SoftwareReleaseListener listener = listenerWith(service);
 
     listener.onFrame(frameFor("docker", "qits/project-agent-next", VERSION));
@@ -399,11 +431,23 @@ class SoftwareReleaseListenerTest {
   /**
    * Same name, wrong type: the maven artifact of a repository that also publishes an image must not
    * move the image's pin — a version written from a jar's release would start containers on a tag
-   * that does not exist. Nothing declares this coordinate, and the authored list is images only.
+   * that does not exist.
+   *
+   * <p>Told against a declaration, which is the only half with rows in it now. A declared coordinate
+   * carries its own {@code packageType} and is matched on BOTH strings, so the docker declaration
+   * below is not reached by a maven frame of the same name. (The authored list would refuse it a
+   * second way — its rows are images by construction, gated on {@link ImagePins#DOCKER_TYPE} — and
+   * that gate stands unchanged for the next row typed into it, with nothing left to exercise it.)
    */
   @Test
   void aNonDockerReleaseNeverMovesAnAuthoredPin() {
-    CapturingService service = new CapturingService();
+    CapturingService service =
+        new CapturingService()
+            .declaring(
+                "docker",
+                "qits/project-agent",
+                "qits-projects",
+                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION");
     SoftwareReleaseListener listener = listenerWith(service);
     EventFrame frame = frameFor("maven", "qits/project-agent", VERSION);
 

@@ -357,9 +357,9 @@ class ConfigurationServiceTest {
    * store-wide state, and a second method posting one would decide this one's answer depending on
    * which ran first.
    *
-   * <p>The application names here are the platform's real ones, because the authored list is a
-   * compile-time constant and there is no pin on an invented application to write. Nothing else in
-   * this module touches them.
+   * <p>The application names here are the platform's real ones where a real key is being modelled,
+   * because the point of the first half is that a STORED entry whose mapping has gone is not
+   * reported. Nothing else in this module touches them.
    */
   @Test
   void thePinReportMergesWhatIsDeclaredWithWhatIsAuthoredAndOmitsWhatWasNeverReleased() {
@@ -367,25 +367,22 @@ class ConfigurationServiceTest {
         configuration.imagePins().isEmpty(),
         "an environment that has released nothing pins nothing — not a row per mapping with no version");
 
+    // TWO STORED ENTRIES THAT NO MAPPING NAMES ANY MORE, written deliberately, because this is the
+    // real state of every qits-projects deployment. env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION was
+    // an authored pin until 2026-09-17 and env.QITS_PROJECTS_AGENT_IMAGE_VERSION until later the
+    // same day; both consumers pin the image in their own pom now, and NOTHING ON THIS PLATFORM
+    // DELETES A CONFIGURATION ENTRY, so both values are still stored and will be tomorrow. Neither
+    // may be reported: the report is about what is launchable-by-configuration, and a row here
+    // would have qits-artifacts protecting a tag on the strength of a value nobody reads.
     configuration.upsert(ENV,
         "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", "2026.904.160152", "alice");
-    // AND AN ENTRY NO MAPPING NAMES, written deliberately: env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION
-    // was an authored pin until 2026-09-17 and the residue of it is still in real stores, because
-    // nothing here deletes an entry. It must not be reported — the report is about what is
-    // launchable-by-configuration, and that version is qits-projects' pom's business now.
     configuration.upsert(ENV,
         "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", "2026.904.160522", "alice");
 
-    assertEquals(
-        List.of(
-            new ImagePinDto(
-                "qits/project-agent",
-                "2026.904.160152",
-                "qits-projects",
-                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
-        configuration.imagePins(),
-        "the one authored mapping, with the version its entry holds — and nothing for the stored"
-            + " entry no mapping names any more");
+    assertTrue(
+        configuration.imagePins().isEmpty(),
+        "a stored entry no mapping names is not a pin — authored is empty and neither key is"
+            + " declared");
 
     // A CONSUMER NOBODY HAS EVER WRITTEN A PIN FOR, arriving through its own declaration: an
     // application says which image its version key carries, and the report answers for it with
@@ -410,19 +407,16 @@ class ConfigurationServiceTest {
     assertEquals(
         List.of(
             new ImagePinDto(
-                "qits/declared", "2026.905.1", "app-declared-pin", "env.QITS_DECLARED_IMAGE_VERSION"),
-            new ImagePinDto(
-                "qits/project-agent",
-                "2026.904.160152",
-                "qits-projects",
-                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
+                "qits/declared", "2026.905.1", "app-declared-pin", "env.QITS_DECLARED_IMAGE_VERSION")),
         configuration.imagePins(),
-        "the declared image joins the authored one in the one order the contract names — and the"
-            + " binary coordinate stays out of a report about container images");
+        "the declared image is the whole answer now that nothing is authored — and the binary"
+            + " coordinate stays out of a report about container images");
 
-    // AND A CONSUMER ADOPTING DECLARATIONS FOR A KEY THAT IS ALREADY AUTHORED: qits-projects now
-    // declares the agent key itself, naming a renamed image. The pair is written once, under the
-    // name its own application gave it.
+    // AND A CONSUMER DECLARING A KEY THAT IS ALREADY STORED: qits-projects declares the agent key
+    // itself, naming a renamed image. The stored value was written by the retired authored pin and
+    // has been unreported since it left; a declaration is what makes it a pin again, under the name
+    // its own application gave it. (That shadowing meets an AUTHORED row in ImagePinsTest, which is
+    // where merge() is exercised directly — there is no authored row left to meet here.)
     declare(
         "qits-projects",
         ConfigurationKeys.TARGET_ENVIRONMENT,
@@ -435,7 +429,7 @@ class ConfigurationServiceTest {
 
     List<ImagePinDto> shadowed = configuration.imagePins();
     assertEquals(
-        2, shadowed.size(), "a declaration of an authored pair replaces its row rather than adding one");
+        2, shadowed.size(), "the declaration adds the one pair it names and nothing else");
     assertTrue(
         shadowed.contains(
             new ImagePinDto(
@@ -446,16 +440,15 @@ class ConfigurationServiceTest {
         "the image the application declares is the one the collector is told to protect");
     assertTrue(
         shadowed.stream().noneMatch(pin -> "qits/project-agent".equals(pin.image())),
-        "and the authored name it shadows is not reported beside it");
+        "and the retired authored name is nowhere in the answer");
 
     // TWO TIERS, TWO VERSIONS, TWO ROWS. The report is the UNION over envs, because its consumer is
     // deciding what it may delete out of one registry the whole platform shares: a version running
     // in a tier this report did not look at is a tag collected out from under a running container.
     //
     // Told against the DECLARED mapping since 2026-09-17. It used to be told against a second
-    // authored pin, and there is no second authored pin any more; the property is the report's and
+    // authored pin, and there is no authored pin at all any more; the property is the report's and
     // has nothing to do with which half a mapping came out of, which is the whole point of merge().
-    // The one authored pair is spoken for by the same-version case below.
     configuration.upsert(
         OTHER_ENV, "app-declared-pin", "env.QITS_DECLARED_IMAGE_VERSION", "2026.905.9", "alice");
 

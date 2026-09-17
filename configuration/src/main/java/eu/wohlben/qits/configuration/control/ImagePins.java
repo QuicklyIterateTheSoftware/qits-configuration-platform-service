@@ -11,37 +11,42 @@ import java.util.Map;
  *
  * <p>A pin says: when this docker image is released, its version becomes the value of this key on
  * this application — an ordinary configuration entry, which the deployer expands into an environment
- * variable and the application starts its next container from. One image and one pin today:
+ * variable and the application starts its next container from. <b>No image and no pin today:
+ * {@link #AUTHORED} is empty.</b>
  *
- * <ul>
- *   <li>{@code qits/project-agent} &rarr; {@code env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code
- *       qits-projects}
- * </ul>
+ * <p><b>It was four until 2026-09-16, two until 2026-09-17, and none by the end of that day</b>, and
+ * every row that left is the shape of where this list was always going: the consumer stopped taking
+ * the image version from configuration and started pinning it as a maven dependency whose version
+ * <em>is</em> the image tag. qits-workspaces went first, taking the workspace and editor rows with
+ * it; qits-projects followed with the refinement container, which pins {@code
+ * eu.wohlben.qits:qits-workspace-daemon-protocol}, and then with the project agent, which pins
+ * {@code eu.wohlben.qits:qits-projects-daemon-protocol} — each gated by its own release request and
+ * proven against the daemon it names by an integration test before it ships. The comment beside
+ * {@link #AUTHORED} has the account of all four.
  *
- * <p><b>It was four until 2026-09-16 and two until 2026-09-17</b>, and every row that left is the
- * shape of where this whole list is going: the consumer stopped taking the image version from
- * configuration and started pinning it as a maven dependency whose version <em>is</em> the image
- * tag. qits-workspaces went first, taking the workspace and editor rows with it; qits-projects
- * followed a day later with the refinement container, which pins
- * {@code eu.wohlben.qits:qits-workspace-daemon-protocol} — gated by its own release request and
- * proven against the daemon by an integration test before it ships. So {@code qits/workspace} has
- * left this list ENTIRELY: it was only still here because that one consumer read it. The comment
- * beside {@link #AUTHORED} has the account. What is left is one row, and it is still meant to
- * shrink to none.
+ * <h2>AN EMPTY LIST IS NOT A RETIRED MECHANISM, AND MUST NOT BE READ AS ONE</h2>
+ *
+ * <p>Nothing here is special-cased on the list being empty and nothing may become so. Zero rows is
+ * the campaign having finished its current wave, not this class having lost its job: it is still the
+ * one place a pin the declaring side cannot express is written down, and the next consumer that
+ * arrives before it can declare — a new image started per unit of work, on an application whose
+ * {@code .config/qits/configuration.yml} does not carry the key — lands here and works with no other
+ * edit. {@link #merge} is still where the declared half and this one meet, {@link #ORDERED} is still
+ * what the report walks, and {@link #BY_IMAGE} is still what the listener matches against. Deleting
+ * the class because its list is empty would take all three with it.
  *
  * <p><b>One image may still land on several applications</b>, and the list allows it: a pin is keyed
  * by the released image and nothing about the write assumes one entry per application, so a second
  * row naming the same image and a different application needs no change to the mechanism. There is
  * no live instance of it any more — {@code qits/workspace} was the worked example, on qits-workspaces
  * and qits-projects at once, and both halves of it have gone. The rule is written down rather than
- * demonstrated, which is the honest state of it: nothing here special-cases the one row that is
- * left, and a fan-out arriving tomorrow would work without an edit.
+ * demonstrated, which is the honest state of it.
  *
  * <p><b>The key spelling is the env override of the property the consumer reads</b>, not a name
- * invented here. SmallRye maps {@code QITS_PROJECTS_AGENT_IMAGE_VERSION} onto {@code
- * qits.projects.agent-image-version} by its own uppercase-and-underscore rule and lets the env
- * win over the committed default, so a key that does not transcribe an existing property writes an
- * entry the consumer never reads — and says nothing about it at any log level.
+ * invented here. SmallRye maps an env var onto a property by its own uppercase-and-underscore rule
+ * and lets the env win over the committed default, so a key that does not transcribe an existing
+ * property writes an entry the consumer never reads — and says nothing about it at any log level.
+ * That is not a historical remark: it is the rule the next row typed below has to satisfy.
  *
  * <h2>Why it is here rather than beside the listener that writes it</h2>
  *
@@ -125,47 +130,54 @@ public final class ImagePins {
    * <p><b>It is the residual list</b> (see the class javadoc): every row here is one whose
    * application has not declared the key yet, and each one leaves as its consumer does.
    */
-  private static final List<Pin> AUTHORED =
-      List.of(
-          new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"));
+  private static final List<Pin> AUTHORED = List.of();
 
-  // THREE ROWS HAVE LEFT, AND ALL THREE LEFT THE OTHER WAY — not to a declaration, but because
-  // their consumer stopped taking the version from configuration at all:
+  // FOUR ROWS HAVE LEFT, AND ALL FOUR LEFT THE OTHER WAY — not to a declaration, but because their
+  // consumer stopped taking the version from configuration at all:
   //
   //   2026-09-16  qits/workspace        qits-workspaces  env.QITS_WORKSPACE_IMAGE_VERSION
   //   2026-09-16  qits/workspace-editor qits-workspaces  env.QITS_EDITOR_IMAGE_VERSION
   //   2026-09-17  qits/workspace        qits-projects    env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION
+  //   2026-09-17  qits/project-agent    qits-projects    env.QITS_PROJECTS_AGENT_IMAGE_VERSION
   //
   // qits-workspaces went first and pins both its images as MAVEN DEPENDENCIES whose own version is
   // the image tag (eu.wohlben.qits:qits-workspace-daemon-protocol and :qits-workspace-editor-image),
   // so the version it starts a container from is a reviewed line in its own pom, gated by its own
   // release request and proven against the daemon by WorkspaceDaemonPinIT before it ships.
   //
-  // qits-projects followed a day later with the third row, by exactly the same mechanism and for
-  // exactly the same reason: its refinement containers (refinementhost/RefinementContainerFactory)
-  // start from the workspace image, and it now pins :qits-workspace-daemon-protocol — the same
-  // artifact, whose version IS the qits/workspace tag — as an ordinary dependency, gated by its own
-  // release request and proven against the daemon by an integration test before it ships. That row
-  // had already replaced qits-projects-service's ci-event-upstream-workspace-daemon.yml, which
-  // carried the same follow by rewriting a property and releasing the service; the pom pin replaces
-  // both, and is the first version of this follow that anything tests before it is used.
+  // qits-projects followed on the 17th, twice in one day and by exactly the same mechanism both
+  // times. Its refinement containers (refinementhost/RefinementContainerFactory) start from the
+  // workspace image and it pins :qits-workspace-daemon-protocol — the same artifact, whose version
+  // IS the qits/workspace tag. Its project-agent containers (agenthost/AgentContainerFactory) start
+  // from qits/project-agent and it pins :qits-projects-daemon-protocol, the artifact that carries
+  // the wire contract the service and that daemon already had to share, whose ${project.version} IS
+  // the image tag. Both are ordinary dependencies, gated by that repository's own release request,
+  // and proven against the daemon they name — RefinementDaemonPinIT and ProjectAgentDaemonPinIT —
+  // before they ship. The refinement row had already replaced qits-projects-service's
+  // ci-event-upstream-workspace-daemon.yml, which carried the same follow by rewriting a property
+  // and releasing the service; the pom pins replace both, and are the first version of this follow
+  // that anything tests before it is used.
   //
-  // Writing any of them from here was the same defect: a newly released image reached the next
-  // container with nothing having tested the pair, and the entry aged past what the registry still
-  // held. SO qits/workspace HAS NO PIN HERE AT ALL NOW — not a row on a different application, not
-  // a row under a different key. It was in this list after 2026-09-16 only because qits-projects
-  // still read it, and that reason is gone.
+  // Writing any of them from here was the same defect four times over: a newly released image
+  // reached the next container with nothing having tested the pair, and the entry aged past what the
+  // registry still held. SO NEITHER qits/workspace NOR qits/project-agent HAS A PIN HERE AT ALL NOW
+  // — not a row on a different application, not a row under a different key.
   //
   // THIS IS NOT A DECLARATION AND `merge` DOES NOT COVER IT. A declared pin shadows an authored row
   // for the same (application, key) — that is the ordinary way a row leaves, and the report keeps
-  // answering for the pair under the name the application itself gave it. These three leave with no
+  // answering for the pair under the name the application itself gave it. These four leave with no
   // successor at all, because the fact moved out of configuration entirely and there is no pair
   // left to answer for, so removing them here is the whole of it on this side. The entries they
-  // already wrote are not deleted by this (nothing here deletes an entry, by design); each consumer
-  // renames or drops its override key so the residue stops being read.
+  // already wrote are not deleted by this (nothing here deletes an entry, by design): each consumer
+  // renames or drops its override key so the residue stops being read — qits-projects' agent key is
+  // `…_IMAGE_VERSION_OVERRIDE` now, and agenthost/RetiredImageVersionKeys WARNs at boot for as long
+  // as the old entry is still in the store. THAT RENAME IS THE WHOLE OF WHAT STOPS THE RESIDUE
+  // DECIDING. Removing a row here stops future WRITES and nothing else.
   //
-  // DO NOT ADD THEM BACK to "keep the pin report complete". The report is about what is
-  // launchable-by-configuration, and neither of these images is, any more.
+  // DO NOT ADD ANY OF THEM BACK to "keep the pin report complete". The report is about what is
+  // launchable-by-configuration, and none of these images is, any more. A row put back would start
+  // rewriting an entry nobody reads, and qits-artifacts would be told to protect a tag on the
+  // strength of it.
 
   /**
    * Every pin in the answer's order — image, then application, then key — sorted here rather than
@@ -181,13 +193,19 @@ public final class ImagePins {
    *
    * <p>That rule was arrived at because {@code qits/workspace} and {@code qits/workspace-editor}
    * share an opening and each had pins of its own, so a prefix match would have had a workspace
-   * release quietly writing the editor's key. NEITHER has a pin here any more — the editor's left on
-   * 2026-09-16 and the workspace image's last row on 2026-09-17 — so the pair that motivated the
-   * rule is gone from the list entirely. That removes the instance and not the rule: matching by
-   * prefix is wrong whether or not two current images happen to collide, and the next pair that
-   * shares an opening must not have to rediscover this. It is asserted rather than left to a
-   * comment — a released name that merely OPENS with a pinned image's name must find no entry here,
-   * which the tests hold against the one image that is still pinned.
+   * release quietly writing the editor's key. Nothing is pinned here any more, so <b>the rule can no
+   * longer be exercised against this map at all</b> — an empty map answers nothing to a whole-name
+   * lookup and to a prefix one alike, and a test asserting that would pass under either
+   * implementation. That removes every instance and none of the rule: matching by prefix is wrong
+   * whether or not two current images happen to collide, and the next pair that shares an opening
+   * must not have to rediscover this.
+   *
+   * <p><b>Where it IS still exercised, and it has to be somewhere:</b> against the DECLARED half,
+   * which is where every live pin is now. {@code ConfigurationService} matches a release against
+   * declared coordinates by indexed equality, and the listener's tests hold a declared {@code
+   * …-next} coordinate against the image it opens with. Read that as the same rule in its surviving
+   * home rather than as a second one — {@link #merge} is what makes the two halves one answer, so a
+   * prefix creeping into either is the same defect.
    */
   public static final Map<String, List<Pin>> BY_IMAGE = byImage();
 

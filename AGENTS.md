@@ -121,6 +121,24 @@ Adding a pin is one more `Pin` in `ImagePins.AUTHORED`. The answer's order (imag
 is sorted from that list rather than trusted to how it is typed, because a machine diffs one run's
 answer against the last one's.
 
+**`AUTHORED` is EMPTY as of 2026-09-17, and an empty list is not a retired mechanism.** The other
+half of the match is what applications declare for themselves in their own
+`.config/qits/configuration.yml`, and `ImagePins.merge` is where the two meet — a declaration shadows
+an authored row for the same (application, key). Every live pin on this platform is declared. Nothing
+here is special-cased on the list being empty and nothing may become so: this is still the one place
+a pin the declaring side cannot express gets written down, and the next consumer that arrives before
+it can declare lands here with no other edit.
+
+Rows also leave the OTHER way, and all four did: the consumer stops taking the version from
+configuration at all and pins the image as a maven dependency whose own version *is* the image tag,
+gated by its own release request and proven against the daemon by its own integration test.
+`qits/workspace` and `qits/workspace-editor` left for qits-workspaces on 2026-09-16, and
+`qits/workspace` (the refinement container) and `qits/project-agent` for qits-projects on 2026-09-17.
+Nothing here deletes the entries such a row already wrote — the consumer renames its key and warns on
+the residue, which is what actually stops the value deciding anything — and they must not be added
+back "to keep the report complete": the report says what is launchable-by-configuration, and those
+images are not. The tombstone beside `AUTHORED` is the account.
+
 ## Identity: two tracks, one set of roles
 
 Authentication happens elsewhere. A request with no `Authorization` header is USER traffic —
