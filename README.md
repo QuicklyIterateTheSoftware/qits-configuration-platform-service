@@ -141,9 +141,10 @@ environment — the one named in the path of the read.
 ### The pin report
 
 `GET /pins` answers one row per image→(application, key)→version that is currently stored, ordered by
-image, then application, then key. An image appears twice when two applications start it —
-`qits/workspace` is a workspace and a refinement container — or when two envs hold different versions
-of it; a mapping with nothing stored anywhere is
+image, then application, then key. An image appears twice when two applications start it — the shape
+allows it, though no mapping uses it today; `qits/workspace` was the example until the last
+application reading it from configuration moved the version into its own pom — or when two envs hold
+different versions of it; a mapping with nothing stored anywhere is
 **omitted**, because an image nobody has released here has no version to name. An empty `pins` is an
 ordinary 200.
 

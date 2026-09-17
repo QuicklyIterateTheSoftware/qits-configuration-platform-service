@@ -43,23 +43,24 @@ import org.junit.jupiter.api.TestMethodOrder;
  * <b>The one thing this service goes out and fetches</b> — and the only way a value gets into its
  * store without somebody typing it.
  *
- * <p>qits-projects starts a container per unit of work — a project agent, and a refinement container
- * from the workspace image — and has to start the version that was <b>just released</b>, which is a fact only qits-ci knows and only at the moment its release
- * pipeline goes green. The alternative — qits-ci reaching into this service on every release — would
- * make a configuration write a synchronous leg of a release and lose it whenever this service was
+ * <p>qits-projects starts a project agent per unit of work, and has to start the version that was
+ * <b>just released</b> — a fact only qits-ci knows, and only at the moment its release pipeline goes
+ * green. The alternative — qits-ci reaching into this service on every release — would make a
+ * configuration write a synchronous leg of a release and lose it whenever this service was
  * mid-cutover. So the release travels as a {@code SoftwareRelease} on the platform's durable event
  * log, and {@code bus/SoftwareReleaseListener} pages it forward into an ordinary entry with an
- * ordinary revision: {@code env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} and {@code
- * env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code qits-projects}. The next deployment reads it
- * through the same resolved read every other extra comes through.
-
- * <p><b>qits-workspaces used to be the other half of this story and is deliberately no longer in
- * it.</b> It took the workspace and editor image versions from entries this listener wrote, and
- * since 2026-09-16 it pins both as maven dependencies whose version is the image tag — so its
- * release decides which image it starts, gated by its own tests. What that leaves here is the frame
- * that moves nothing, which the story keeps and asserts: a released image no mapping names must
- * write no entry, and {@code qits/workspace-editor} opening with {@code qits/workspace} is what
- * makes that assertion worth having.
+ * ordinary revision: {@code env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code qits-projects}. The
+ * next deployment reads it through the same resolved read every other extra comes through.
+ *
+ * <p><b>The workspace image used to be half of this story and is deliberately no longer in it at
+ * all.</b> Two applications took its version from entries this listener wrote: qits-workspaces,
+ * which starts a workspace from it, and qits-projects, which starts a refinement container from the
+ * same image. Both moved the same way and within a day of each other — qits-workspaces on
+ * 2026-09-16, qits-projects on 2026-09-17 — to a maven dependency whose version IS the image tag,
+ * so each one's own release decides which image it starts, gated by its own tests. What that leaves
+ * here is the frame that moves nothing, which the story keeps and asserts in both its shapes: a
+ * released image no mapping names must write no entry, and an entry the store still holds from a
+ * mapping that has gone must not be rewritten by the release that used to move it.
  *
  * <p><b>The direction of the arrow is the point.</b> Nothing pushes into this service: the listener
  * is durable, so the catch-up sweep <i>pulls</i> the log forward from its own watermark — which is
@@ -67,13 +68,13 @@ import org.junit.jupiter.api.TestMethodOrder;
  * The edge in the diagram is therefore {@code qits-configuration -> qits-events}, and it is the only
  * outgoing HTTP arrow in this whole catalogue that is not the startup fetch of the idp's keys.
  *
- * <p><b>And one of the five frames is deliberately ignored.</b> A {@code SoftwareRelease} is acted
+ * <p><b>And three of the five frames are deliberately ignored.</b> A {@code SoftwareRelease} is acted
  * on only when some application declared its coordinate or {@code control/ImagePins} names the image.
- * The maven release of the same repository, published moments later and carrying a much higher
- * version, must not touch the pin — a version this service wrote from a jar's release would start
- * containers on an image tag that does not exist. It is ordered <b>before</b> the project-agent frame
- * on purpose: when the second pin appears, the frame between them has provably been offered and
- * skipped.
+ * Two of the three are the images that left; the third is the maven release of the same repository
+ * as the pinned image, published moments earlier and carrying a much higher version, which must not
+ * touch the pin — a version this service wrote from a jar's release would start containers on an
+ * image tag that does not exist. It is ordered <b>before</b> the project-agent frame on purpose:
+ * when the pin appears, the frame before it has provably been offered and skipped.
  *
  * <p><b>The last frame is the one nothing here was ever told about.</b> {@code qits/story-declared}
  * is in no list in this repository; it is pinned because the application declared the key itself and
@@ -97,7 +98,11 @@ public class ImageReleasePinIT {
   /** The reader of the pin, and the reason it is written at all. */
   static final String DEPLOYER = "qits-platform-deployments";
 
-  /** The applications the two pinned images belong to. */
+  /**
+   * The application the retired workspace and editor pins used to land on. It is in this story only
+   * so the frames that must move nothing can be asserted against the keys they would have been
+   * written under.
+   */
   static final String WORKSPACES = "qits-workspaces";
 
   static final String PROJECTS = "qits-projects";
@@ -112,15 +117,21 @@ public class ImageReleasePinIT {
    * opposite reason now: a released image whose key nothing maps must leave no entry, and asserting
    * that against the key it would have been written under is stronger than asserting nothing
    * anywhere. {@code env.QITS_WORKSPACE_IMAGE_VERSION} left in the same wave and is not named at all
-   * — its absence is covered by the refinement pin still holding the workspace version.
+   * — the key below covers the workspace image's departure on the application that held it longest.
    */
   static final String EDITOR_IMAGE_KEY = "env.QITS_EDITOR_IMAGE_VERSION";
 
   /**
-   * …and the workspace image lands on qits-projects as well, under the key that application reads —
-   * one image, two applications, which is the other half of the map's shape. qits-projects starts a
-   * refinement container from the very image qits-workspaces starts a workspace from, so a single
-   * release has to reach both.
+   * The key the workspace image USED to be pinned under on qits-projects, kept for the same reason
+   * the editor's is: so the story can assert it is not written.
+   *
+   * <p>qits-projects starts a refinement container from the workspace image, and until 2026-09-17
+   * this listener wrote that version here — the last reason {@code qits/workspace} was in {@code
+   * control/ImagePins} at all. It pins the image as a maven dependency now, whose version is the
+   * tag, so the release that used to move this key must move nothing. This is the sharper of the two
+   * absences: the editor's key was never written in this run, while THIS one names a mapping that
+   * existed, on an application this story does pin under another key — so a listener that had
+   * quietly kept the row would be caught writing it rather than merely failing to.
    */
   static final String REFINEMENT_IMAGE_KEY = "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION";
 
@@ -206,11 +217,11 @@ public class ImageReleasePinIT {
       category = CATEGORY)
   @UserStoryDescription(
       """
-      qits-ci finishes a release of the workspace image and announces it on the platform's event
+      qits-ci finishes a release of the project-agent image and announces it on the platform's event
       log. qits-configuration is a durable consumer of that log: its catch-up sweep pages the log
       forward from its own watermark, finds the release, and writes the version into its own store
-      as env.QITS_WORKSPACE_IMAGE_VERSION on qits-workspaces — an ordinary entry, with an ordinary
-      revision, attributed to the listener that wrote it. The next deployment of qits-workspaces
+      as env.QITS_PROJECTS_AGENT_IMAGE_VERSION on qits-projects — an ordinary entry, with an ordinary
+      revision, attributed to the listener that wrote it. The next deployment of qits-projects
       reads it through the same resolved read every other extra comes through, and starts its
       containers on the image that was just released.
 
@@ -223,17 +234,16 @@ public class ImageReleasePinIT {
       the applications that have not declared yet, and a declaration wins wherever both name the same
       key.
 
-      Five releases arrive together and only four are pins, but four pinned images are five
-      entries. The workspace image and the editor image both land on qits-workspaces, each under its
-      own env key (env.QITS_WORKSPACE_IMAGE_VERSION and env.QITS_EDITOR_IMAGE_VERSION), and the
-      project agent's lands on qits-projects. The workspace image lands on qits-projects too, as
-      env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION: a refinement container is started from the same
-      image a workspace is, so one release moves two applications at once — several images may share
-      an application, and one image may serve several. The maven release of the same repository
-      carries a far higher version
-      and is left alone, because a pin is keyed on the docker package name and nothing else — and
-      qits/workspace-editor opening with qits/workspace does not make one a prefix of the other, the
-      match is the whole name. Pulling rather than being pushed is what makes this survive: a release
+      Five releases arrive together and only two of them are pinned by anything, which is as much of
+      the story as the two that are. The maven release of the same repository as the project-agent
+      image carries a far higher version and is left alone, because a pin is keyed on the docker
+      package name and nothing else. The workspace image and the editor image move nothing at all:
+      both were pinned here until September 2026 — the editor and a workspace on qits-workspaces, a
+      refinement container on qits-projects — and each of those applications now takes the version
+      from a maven dependency of its own, whose version is the image tag, so its own release decides
+      which image it starts and its own tests prove the pair before it ships. The entries those pins
+      wrote are still in the store, because nothing here deletes one, and the releases that used to
+      rewrite them must not. Pulling rather than being pushed is what makes this survive: a release
       announced while this service was restarting is still read back the next time it sweeps.
       """)
   @UserflowRunsAfter({
@@ -277,15 +287,17 @@ public class ImageReleasePinIT {
                 WORKSPACE_VERSION,
                 "docker",
                 "qits/workspace"),
-            // Between the two pins on purpose: when the second one lands, this one has provably
-            // been offered to the listener and left alone.
+            // Immediately BEFORE the pin it shares a name with, on purpose: when that pin lands
+            // holding the docker version, this frame has provably been offered to the listener and
+            // left alone. It names qits/project-agent since 2026-09-17 — it used to be the maven
+            // jar of qits/workspace, and that image has no pin left for a jar to threaten.
             StoryEventBus.softwareRelease(
-                "release-workspace-maven-jar",
+                "release-project-agent-maven-jar",
                 "2026-08-29T11:05:00Z",
-                WORKSPACES,
+                PROJECTS,
                 MAVEN_VERSION,
                 "maven",
-                "qits/workspace"),
+                "qits/project-agent"),
             StoryEventBus.softwareRelease(
                 "release-project-agent-image",
                 "2026-08-29T11:10:00Z",
@@ -293,8 +305,9 @@ public class ImageReleasePinIT {
                 AGENT_VERSION,
                 "docker",
                 "qits/project-agent"),
-            // The editor image, whose name opens with the workspace image's: it is its own pin on the
-            // same application, and a release of it must move its own key and only its own.
+            // The editor image, whose name opens with the workspace image's. Neither is pinned by
+            // anything here any more, so this frame's correct effect — like the workspace frame's —
+            // is no write at all.
             StoryEventBus.softwareRelease(
                 "release-workspace-editor-image",
                 "2026-08-29T11:15:00Z",
@@ -312,55 +325,43 @@ public class ImageReleasePinIT {
                 "docker",
                 DECLARED_IMAGE)));
     story
-        .note("qits-ci announces five releases: four docker images and one jar of the same repository — and only three of them are pinned by anything")
+        .note("qits-ci announces five releases: four docker images and one jar of the same repository — and only two of them are pinned by anything")
         .as("releases-announced");
 
-    // qits-projects starts its refinement containers from the workspace image, and since 2026-09-16
-    // it is the ONLY application this image is pinned for: qits-workspaces takes the same version
-    // from its own pom instead. The follow this replaced was qits-projects-service's CI hop, which
-    // rewrote a property and released the service to carry the number.
-    assertEquals(
-        WORKSPACE_VERSION,
-        awaitPin(PROJECTS, REFINEMENT_IMAGE_KEY),
-        "the workspace image must reach the application that starts a refinement from it");
-    story
-        .note("the workspace image's version reaches qits-projects, which starts a refinement container from it — with no release of qits-projects to carry the number")
-        .as("refinement-image-pinned");
-
+    // The one authored pin left. Waiting on it is also what puts the two frames announced BEFORE it
+    // — the workspace image and the maven jar — provably behind the listener's watermark, which is
+    // what makes the assertions below about them assertions rather than a race.
     assertEquals(
         AGENT_VERSION,
         awaitPin(PROJECTS, AGENT_IMAGE_KEY),
-        "and the project-agent's, on the application that starts that one");
+        "the project-agent image's version must reach the application that starts it");
     story
-        .note("so is the project agent's, under its own key — the pins are a map, not a special case")
+        .note("the project agent image's version reaches qits-projects, which starts a container per unit of work from it — with no release of qits-projects to carry the number")
         .as("agent-image-pinned");
 
-    // The maven frame sat between the two, so it has been offered and skipped by now. This is what
-    // says so: the pin is still the DOCKER version, not the jar's.
+    // The maven frame sat immediately before it, so it has been offered and skipped by now. This is
+    // what says so: the pin is still the DOCKER version, not the jar's much higher one.
     assertEquals(
-        WORKSPACE_VERSION,
-        pinOf(PROJECTS, REFINEMENT_IMAGE_KEY),
+        AGENT_VERSION,
+        pinOf(PROJECTS, AGENT_IMAGE_KEY),
         "a maven release of the same repository must never move an image pin");
     story
         .note("the jar release of the same repository moved nothing: a pin is keyed on the image")
         .as("maven-release-ignored");
 
-    // THE IMAGE THIS SERVICE NO LONGER PINS AT ALL, and it is the sharpest frame in the story.
-    // qits/workspace-editor opens with qits/workspace, so under a prefix match this release would
-    // move the workspace image's pin; and until 2026-09-16 it had a pin of its own on
-    // qits-workspaces. Both are gone — qits-workspaces pins the editor image in its pom — so the
-    // correct effect is NOTHING, and the refinement pin still holding the workspace version is what
-    // proves the match is whole-name rather than a prefix.
+    // THE IMAGE THIS SERVICE NO LONGER PINS AT ALL, and the sharper of the two frames that say so.
+    // qits-projects starts a refinement container from the workspace image and took that version
+    // from here until 2026-09-17 — it pins eu.wohlben.qits:qits-workspace-daemon-protocol now, whose
+    // version IS the tag, gated by its own release request and proven against the daemon before it
+    // ships. So this release must leave the key alone. The application is one this story DOES pin
+    // under another key, and the agent pin above has already landed on it, so a listener that had
+    // kept the row would be caught having written it rather than merely not having.
     assertNull(
-        pinOf(WORKSPACES, EDITOR_IMAGE_KEY),
-        "the editor image is pinned by nothing here; qits-workspaces pins it in its own pom");
-    assertEquals(
-        WORKSPACE_VERSION,
         pinOf(PROJECTS, REFINEMENT_IMAGE_KEY),
-        "and an editor release must not be read as a workspace one — the match is whole-name");
+        "the workspace image is pinned by nothing here; qits-projects pins it in its own pom");
     story
-        .note("the editor image's release moves nothing at all: its version is qits-workspaces' pom's business now, and a name that merely opens with a pinned image's is not that image")
-        .as("editor-release-moves-nothing");
+        .note("the workspace image's release moves nothing at all: the refinement container's version is qits-projects' own pom's business now, decided by its release rather than written underneath it")
+        .as("workspace-release-moves-nothing");
 
     // THE HALF THIS SERVICE WAS NEVER TOLD ABOUT. Nothing in control/ImagePins names
     // qits/story-declared; the only reason this release lands anywhere is the document the pipeline
@@ -372,6 +373,23 @@ public class ImageReleasePinIT {
     story
         .note("the image only the application itself declared is pinned too — a new consumer needs no edit to this service")
         .as("declared-image-pinned");
+
+    // …and the editor image, which left a day earlier than the workspace one, with qits-workspaces.
+    // Its name opens with the workspace image's, which is the collision the whole-name match was
+    // written for; neither has a mapping now, so what this frame still proves is the plainer claim —
+    // a released image nothing maps writes no entry, asserted against the key it would have been
+    // written under.
+    //
+    // ASSERTED LAST BECAUSE IT WAS ANNOUNCED LAST BUT ONE. This frame sits after the project-agent
+    // release on the log, so the agent pin landing says nothing about whether it has been offered
+    // yet; the DECLARED pin above was announced after it, and waiting on that is what turns this
+    // from a race that always passes into an assertion.
+    assertNull(
+        pinOf(WORKSPACES, EDITOR_IMAGE_KEY),
+        "the editor image is pinned by nothing here; qits-workspaces pins it in its own pom");
+    story
+        .note("the editor image's release moves nothing either: both halves of the image pair this service used to pin now come from their consumers' own poms")
+        .as("editor-release-moves-nothing");
 
     List<Map<String, Object>> revisions =
         StoryIdentities.platformService(given(), DEPLOYER)
@@ -446,13 +464,15 @@ public class ImageReleasePinIT {
   static void theStoryReportIsComplete() {
     ReportAssertions.assertComplete(CATEGORY, PINNED_SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "releases-announced");
-    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "refinement-image-pinned");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "agent-image-pinned");
-    // Where `editor-image-pinned` and `workspace-image-pinned` were until 2026-09-16. The editor
-    // frame is still told and now says the opposite; the workspace one has no step at all, because
-    // the application it used to pin takes that version from its own pom.
-    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "editor-release-moves-nothing");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "maven-release-ignored");
+    // Where `workspace-image-pinned`, `editor-image-pinned` and `refinement-image-pinned` were,
+    // until the three rows naming those two images left control/ImagePins in September 2026. Two
+    // frames are still told and both now say the opposite of what they used to: the image is
+    // released and this service writes nothing, because the applications that start containers from
+    // it take the version from their own poms.
+    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "workspace-release-moves-nothing");
+    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "editor-release-moves-nothing");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "declaration-published");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "declared-image-pinned");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "pin-attributed");
@@ -503,10 +523,12 @@ public class ImageReleasePinIT {
         PIPELINE,
         StoryTarget.SERVICE,
         "POST " + StoryTarget.declarationPath(DECLARING, DECLARED_TAG) + " -> 201");
-    // Six arrows and no seventh, however many times the story polled: the three reads it waited on,
-    // the history it checked, the declaration the pipeline published, and the one page of the log
-    // that carried the releases. Two actors, because a declaration is a machine's assertion about a
-    // build and a resolved read is the deployer's — no person is on this path at all.
+    // Six arrows and no seventh, however many times the story polled: the resolved read of each of
+    // the three applications it asks about — two it waited on for a pin, one it checks for the
+    // absence of one — the history it checked, the declaration the pipeline published, and the one
+    // page of the log that carried the releases. Two actors, because a declaration is a machine's
+    // assertion about a build and a resolved read is the deployer's — no person is on this path at
+    // all.
     ReportAssertions.assertEdgeCount(CATEGORY, PINNED_SLUG, 6);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY, PINNED_SLUG, List.of(DEPLOYER, PIPELINE, StoryTarget.SERVICE));

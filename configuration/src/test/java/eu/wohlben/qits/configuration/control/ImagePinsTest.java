@@ -26,9 +26,7 @@ class ImagePinsTest {
   void theOrderIsImageThenApplicationThenKey() {
     assertEquals(
         List.of(
-            new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
-            new Pin(
-                "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
+            new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
         ImagePins.ORDERED,
         "the answer's order is sorted, not the order the list happens to be typed in");
   }
@@ -51,18 +49,31 @@ class ImagePinsTest {
   }
 
   /**
-   * The match is a whole-name lookup, and the editor is what proves it is not a prefix one.
+   * The match is a whole-name lookup, held against the one image that is still pinned.
    *
-   * <p>{@code qits/workspace-editor} opens with {@code qits/workspace} and has had no pin here since
-   * qits-workspaces moved both image versions into its own pom (2026-09-16). Under a prefix match a
-   * workspace release would therefore now write nothing extra and this would look fine; under the
-   * whole-name match the editor is simply absent, which is the same answer an image nobody pins
-   * gets. Asserting the absence keeps the rule under test after the collision that motivated it
-   * stopped existing.
+   * <p>The pair that motivated the rule — {@code qits/workspace} and {@code qits/workspace-editor},
+   * which share an opening and each had pins of their own — has left the list entirely: the editor's
+   * row on 2026-09-16 with qits-workspaces, the workspace image's last row on 2026-09-17 with
+   * qits-projects' refinement container. Asserting their absence is still worth doing (a row
+   * reappearing is the retired defect coming back) but it no longer EXERCISES the rule, because a
+   * prefix implementation would find nothing to match either.
+   *
+   * <p>So the rule is exercised against {@code qits/project-agent} instead. {@code
+   * qits/project-agent-next} opens with it and is a different image; under a prefix match it would
+   * be handed the agent's pin, and under the whole-name match it is simply absent — the same answer
+   * an image nobody pins gets. The name is synthetic on purpose: the point is the lookup, and
+   * waiting for two real images to collide again is how a platform rediscovers this defect.
    */
   @Test
-  void theWorkspaceImageMovesOnePinAndTheEditorImageNone() {
-    assertEquals(1, ImagePins.BY_IMAGE.get("qits/workspace").size());
+  void theMatchIsTheWholeImageNameAndNeverAPrefixOfIt() {
+    assertEquals(1, ImagePins.BY_IMAGE.get("qits/project-agent").size());
+    assertNull(
+        ImagePins.BY_IMAGE.get("qits/project-agent-next"),
+        "a name that merely opens with a pinned image's name is not that image");
+
+    assertNull(
+        ImagePins.BY_IMAGE.get("qits/workspace"),
+        "the workspace image is pinned by nothing here; its last consumer pins it in its own pom");
     assertNull(
         ImagePins.BY_IMAGE.get("qits/workspace-editor"),
         "the editor's version is qits-workspaces' pom's business now, not configuration's");
@@ -109,11 +120,17 @@ class ImagePinsTest {
    * Shadowing is per PAIR, not per application: a half-adopted consumer has declared one of its keys
    * and is still carried by hand on another, and the one it has not declared must not disappear with
    * the one it has.
+   *
+   * <p>The declared pair is a synthetic second key on the real application, and has to be: since
+   * 2026-09-17 qits-projects has exactly ONE authored row, so there is no second real key of its own
+   * to declare. Inventing the key rather than the application is what keeps the case honest — the
+   * property is about two pairs of one application meeting {@link ImagePins#merge}, and the authored
+   * half of it is the real row.
    */
   @Test
   void anApplicationThatDeclaresOneKeyKeepsTheAuthoredRowForItsOther() {
     Pin declared =
-        new Pin("qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION");
+        new Pin("qits/sandbox", "qits-projects", "env.QITS_PROJECTS_SANDBOX_IMAGE_VERSION");
 
     List<Pin> merged = ImagePins.merge(List.of(declared), ImagePins.ORDERED);
 

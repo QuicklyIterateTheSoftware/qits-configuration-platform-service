@@ -20,8 +20,8 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
  * version, and the entry it was read from. It is a projection of entries a caller could read one at
  * a time through {@code /applications/{app}/entries}; what it adds is <b>the map</b>, which lives in
  * this service and nowhere else, so the caller does not have to know that {@code
- * env.QITS_EDITOR_IMAGE_VERSION} on {@code qits-workspaces} is a version of {@code
- * qits/workspace-editor}.
+ * env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code qits-projects} is a version of {@code
+ * qits/project-agent}.
  *
  * <p><b>Who reads it, and why an access timestamp will not do.</b> qits-artifacts' garbage collector
  * takes this as a pin source when it decides which images it may delete. A configured version is one

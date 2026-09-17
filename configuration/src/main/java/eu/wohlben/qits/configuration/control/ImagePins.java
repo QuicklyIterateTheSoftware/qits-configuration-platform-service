@@ -11,30 +11,35 @@ import java.util.Map;
  *
  * <p>A pin says: when this docker image is released, its version becomes the value of this key on
  * this application — an ordinary configuration entry, which the deployer expands into an environment
- * variable and the application starts its next container from. Two images and two pins today:
+ * variable and the application starts its next container from. One image and one pin today:
  *
  * <ul>
  *   <li>{@code qits/project-agent} &rarr; {@code env.QITS_PROJECTS_AGENT_IMAGE_VERSION} on {@code
  *       qits-projects}
- *   <li>{@code qits/workspace} &rarr; {@code env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} on {@code
- *       qits-projects}
  * </ul>
  *
- * <p><b>It was four until 2026-09-16</b>, and the two that left are the shape of where this whole
- * list is going: qits-workspaces stopped taking the workspace and editor image versions from
- * configuration and now pins them as maven dependencies whose version <em>is</em> the image tag. The
- * comment beside {@link #AUTHORED} has the account. What is left here is the residual, and it is
- * still meant to shrink.
+ * <p><b>It was four until 2026-09-16 and two until 2026-09-17</b>, and every row that left is the
+ * shape of where this whole list is going: the consumer stopped taking the image version from
+ * configuration and started pinning it as a maven dependency whose version <em>is</em> the image
+ * tag. qits-workspaces went first, taking the workspace and editor rows with it; qits-projects
+ * followed a day later with the refinement container, which pins
+ * {@code eu.wohlben.qits:qits-workspace-daemon-protocol} — gated by its own release request and
+ * proven against the daemon by an integration test before it ships. So {@code qits/workspace} has
+ * left this list ENTIRELY: it was only still here because that one consumer read it. The comment
+ * beside {@link #AUTHORED} has the account. What is left is one row, and it is still meant to
+ * shrink to none.
  *
  * <p><b>One image may still land on several applications</b>, and the list allows it: a pin is keyed
- * by the released image and nothing about the write assumes one entry per application. {@code
- * qits/workspace} is the toolchain-plus-daemon image that qits-projects starts a refinement
- * container from; it used to move a second key on qits-workspaces too, and the mechanism that made
- * that possible is unchanged even though only one consumer uses it today.
+ * by the released image and nothing about the write assumes one entry per application, so a second
+ * row naming the same image and a different application needs no change to the mechanism. There is
+ * no live instance of it any more — {@code qits/workspace} was the worked example, on qits-workspaces
+ * and qits-projects at once, and both halves of it have gone. The rule is written down rather than
+ * demonstrated, which is the honest state of it: nothing here special-cases the one row that is
+ * left, and a fan-out arriving tomorrow would work without an edit.
  *
  * <p><b>The key spelling is the env override of the property the consumer reads</b>, not a name
- * invented here. SmallRye maps {@code QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} onto {@code
- * qits.projects.refinement-image-version} by its own uppercase-and-underscore rule and lets the env
+ * invented here. SmallRye maps {@code QITS_PROJECTS_AGENT_IMAGE_VERSION} onto {@code
+ * qits.projects.agent-image-version} by its own uppercase-and-underscore rule and lets the env
  * win over the committed default, so a key that does not transcribe an existing property writes an
  * entry the consumer never reads — and says nothing about it at any log level.
  *
@@ -122,35 +127,45 @@ public final class ImagePins {
    */
   private static final List<Pin> AUTHORED =
       List.of(
-          new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
-          // qits-projects starts its refinement containers from the same image
-          // (refinementhost/RefinementContainerFactory), so its release moves this key too —
-          // formerly qits-projects-service's ci-event-upstream-workspace-daemon.yml.
-          new Pin(
-              "qits/workspace", "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"));
+          new Pin("qits/project-agent", "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"));
 
-  // TWO ROWS LEFT ON 2026-09-16, AND THEY LEFT THE OTHER WAY — not to a declaration, but because
+  // THREE ROWS HAVE LEFT, AND ALL THREE LEFT THE OTHER WAY — not to a declaration, but because
   // their consumer stopped taking the version from configuration at all:
   //
-  //   qits/workspace        qits-workspaces  env.QITS_WORKSPACE_IMAGE_VERSION
-  //   qits/workspace-editor qits-workspaces  env.QITS_EDITOR_IMAGE_VERSION
+  //   2026-09-16  qits/workspace        qits-workspaces  env.QITS_WORKSPACE_IMAGE_VERSION
+  //   2026-09-16  qits/workspace-editor qits-workspaces  env.QITS_EDITOR_IMAGE_VERSION
+  //   2026-09-17  qits/workspace        qits-projects    env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION
   //
-  // qits-workspaces now pins both images as MAVEN DEPENDENCIES whose own version is the image tag
-  // (eu.wohlben.qits:qits-workspace-daemon-protocol and :qits-workspace-editor-image), so the
-  // version it starts a container from is a reviewed line in its own pom, gated by its own release
-  // request and proven against the daemon by WorkspaceDaemonPinIT before it ships. Writing it from
-  // here was the defect: a new image reached the next workspace with nothing having tested the
-  // pair, and the entry aged past what the registry still held.
+  // qits-workspaces went first and pins both its images as MAVEN DEPENDENCIES whose own version is
+  // the image tag (eu.wohlben.qits:qits-workspace-daemon-protocol and :qits-workspace-editor-image),
+  // so the version it starts a container from is a reviewed line in its own pom, gated by its own
+  // release request and proven against the daemon by WorkspaceDaemonPinIT before it ships.
+  //
+  // qits-projects followed a day later with the third row, by exactly the same mechanism and for
+  // exactly the same reason: its refinement containers (refinementhost/RefinementContainerFactory)
+  // start from the workspace image, and it now pins :qits-workspace-daemon-protocol — the same
+  // artifact, whose version IS the qits/workspace tag — as an ordinary dependency, gated by its own
+  // release request and proven against the daemon by an integration test before it ships. That row
+  // had already replaced qits-projects-service's ci-event-upstream-workspace-daemon.yml, which
+  // carried the same follow by rewriting a property and releasing the service; the pom pin replaces
+  // both, and is the first version of this follow that anything tests before it is used.
+  //
+  // Writing any of them from here was the same defect: a newly released image reached the next
+  // container with nothing having tested the pair, and the entry aged past what the registry still
+  // held. SO qits/workspace HAS NO PIN HERE AT ALL NOW — not a row on a different application, not
+  // a row under a different key. It was in this list after 2026-09-16 only because qits-projects
+  // still read it, and that reason is gone.
   //
   // THIS IS NOT A DECLARATION AND `merge` DOES NOT COVER IT. A declared pin shadows an authored row
-  // for the same (application, key) — that is the ordinary way a row leaves. These two leave with
-  // no successor at all, because the fact moved out of configuration entirely, so removing them
-  // here is the whole of it on this side. The entries they already wrote are not deleted by this
-  // (nothing here deletes an entry, by design); qits-workspaces renamed its override key so the
-  // residue stops being read, and warns at boot while it is still present.
+  // for the same (application, key) — that is the ordinary way a row leaves, and the report keeps
+  // answering for the pair under the name the application itself gave it. These three leave with no
+  // successor at all, because the fact moved out of configuration entirely and there is no pair
+  // left to answer for, so removing them here is the whole of it on this side. The entries they
+  // already wrote are not deleted by this (nothing here deletes an entry, by design); each consumer
+  // renames or drops its override key so the residue stops being read.
   //
   // DO NOT ADD THEM BACK to "keep the pin report complete". The report is about what is
-  // launchable-by-configuration, and these two images are not, any more.
+  // launchable-by-configuration, and neither of these images is, any more.
 
   /**
    * Every pin in the answer's order — image, then application, then key — sorted here rather than
@@ -166,10 +181,13 @@ public final class ImagePins {
    *
    * <p>That rule was arrived at because {@code qits/workspace} and {@code qits/workspace-editor}
    * share an opening and each had pins of its own, so a prefix match would have had a workspace
-   * release quietly writing the editor's key. The editor has no pin here since 2026-09-16, which
-   * removes the instance and not the rule: matching by prefix is wrong whether or not two current
-   * images happen to collide, and the next pair that shares an opening must not have to rediscover
-   * this.
+   * release quietly writing the editor's key. NEITHER has a pin here any more — the editor's left on
+   * 2026-09-16 and the workspace image's last row on 2026-09-17 — so the pair that motivated the
+   * rule is gone from the list entirely. That removes the instance and not the rule: matching by
+   * prefix is wrong whether or not two current images happen to collide, and the next pair that
+   * shares an opening must not have to rediscover this. It is asserted rather than left to a
+   * comment — a released name that merely OPENS with a pinned image's name must find no entry here,
+   * which the tests hold against the one image that is still pinned.
    */
   public static final Map<String, List<Pin>> BY_IMAGE = byImage();
 

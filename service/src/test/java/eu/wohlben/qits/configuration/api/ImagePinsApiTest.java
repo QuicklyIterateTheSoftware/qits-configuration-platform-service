@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The applications and keys are the platform's real ones, because the AUTHORED half of the map is
  * a compile-time constant: there is no pin on an application of this test's own to write. Nothing
- * else in this suite touches them, and every test begins by writing all four values, so none depends
+ * else in this suite touches them, and every test begins by writing every value, so none depends
  * on the order the class is run in — the two that change the answer put back what they removed or
  * added.
  *
@@ -39,9 +39,12 @@ class ImagePinsApiTest {
 
   private static final String AGENT_VERSION = "2026.904.160152";
 
+  /**
+   * The version of the entry NO mapping names any more — see {@link #pinEveryImage()}. Kept under
+   * the image's name because that is what it is a version of; the point of it here is that the
+   * report must not mention it.
+   */
   private static final String WORKSPACE_VERSION = "2026.904.160522";
-
-  private static final String EDITOR_VERSION = "2026.904.100239";
 
   /** The application of the declared half — this test's own, since a declaration is per application. */
   private static final String DECLARED_APP = "pins-declaring-app";
@@ -66,7 +69,17 @@ class ImagePinsApiTest {
       RestAssuredConfig.config()
           .encoderConfig(EncoderConfig.encoderConfig().encodeContentTypeAs(YAML, ContentType.TEXT));
 
-  /** Every mapping of the map, written. Idempotent, so either test may run first. */
+  /**
+   * Every mapping of the map, written — and one entry that is no longer a mapping at all.
+   * Idempotent, so either test may run first.
+   *
+   * <p>{@code env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION} was an authored pin until 2026-09-17, when
+   * qits-projects started taking the refinement container's image version from a maven dependency of
+   * its own instead. Nothing here deletes an entry, so the residue is still in real stores — and
+   * writing it deliberately is what lets the assertions below say the report does not claim it. A
+   * report that answered for it would have qits-artifacts protecting a tag on the strength of a
+   * value nothing reads.
+   */
   private void pinEveryImage() {
     put("qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", AGENT_VERSION);
     put("qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", WORKSPACE_VERSION);
@@ -85,10 +98,11 @@ class ImagePinsApiTest {
   /**
    * Every mapping is a row, in the order the contract names — image, then application, then key.
    *
-   * <p>It was four rows until 2026-09-16, when qits-workspaces stopped taking the workspace and
-   * editor image versions from configuration and started pinning them as maven dependencies of its
-   * own. Two rows left with it, and the one that still names {@code qits/workspace} is qits-projects'
-   * refinement container — which is why the image is still here at all.
+   * <p>It was four rows until 2026-09-16 and two until 2026-09-17, and every row that left did so the
+   * same way: its consumer stopped taking the image version from configuration and started pinning
+   * it as a maven dependency whose version is the image tag. qits-workspaces took the workspace and
+   * editor rows with it; qits-projects took the refinement container's a day later, which is why
+   * {@code qits/workspace} is not in this answer at all any more.
    */
   @Test
   void everyConfiguredImageVersionIsARowInTheMapsOrder() {
@@ -101,19 +115,18 @@ class ImagePinsApiTest {
         .statusCode(200)
         // An ISO instant rather than an epoch number: a receipt quotes when it asked.
         .body("generatedAt", endsWith("Z"))
-        .body("pins.size()", equalTo(2))
+        .body("pins.size()", equalTo(1))
         .body("pins[0].image", equalTo("qits/project-agent"))
         .body("pins[0].version", equalTo(AGENT_VERSION))
         .body("pins[0].application", equalTo("qits-projects"))
         .body("pins[0].key", equalTo("env.QITS_PROJECTS_AGENT_IMAGE_VERSION"))
-        .body("pins[1].image", equalTo("qits/workspace"))
-        .body("pins[1].version", equalTo(WORKSPACE_VERSION))
-        .body("pins[1].application", equalTo("qits-projects"))
-        .body("pins[1].key", equalTo("env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"))
-        // AND NOTHING FOR qits-workspaces. The entries it used to be handed may well still exist —
-        // nothing here deletes one — but they are no longer MAPPED, so they are not launchable-by-
-        // configuration and the report must not claim them.
-        .body("pins.application", everyItem(not(equalTo("qits-workspaces"))));
+        // AND NOTHING FOR THE ENTRY NO MAPPING NAMES, which pinEveryImage has just written. The
+        // entries a retired pin left behind may well still exist — nothing here deletes one — but
+        // they are no longer MAPPED, so they are not launchable-by-configuration and the report must
+        // not claim them. Asserted on the KEY as well as the image: the size above would catch a
+        // second row, and these two say which row it would have been.
+        .body("pins.key", everyItem(not(equalTo("env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"))))
+        .body("pins.image", everyItem(not(equalTo("qits/workspace"))));
   }
 
   /**
@@ -121,10 +134,13 @@ class ImagePinsApiTest {
    * has never been released into this environment, and a row naming {@code qits/project-agent:}
    * would be a tag that cannot exist.
    *
-   * <p>Told against the agent pin since 2026-09-16. It used to be told against the editor's, which
-   * was the natural choice while that was the one image most likely to be genuinely unreleased —
-   * and the editor has no mapping at all now, so deleting its entry would prove nothing about
-   * omission. The property is the mapping's, not any particular image's.
+   * <p>Told against the agent pin since 2026-09-16, and since 2026-09-17 it is the only pin there is
+   * to tell it against — so the answer it leaves behind is an EMPTY list, which the route is
+   * documented to serve as an ordinary 200. That is the strongest form of the assertion rather than
+   * a weaker one: a report that answered a mapping with no stored version would put a blank version
+   * in the one row it could have written, and here there is nowhere for such a row to hide. The
+   * entry pinEveryImage writes for the retired refinement mapping is still in the store throughout,
+   * and still produces nothing.
    */
   @Test
   void aMappingWithNothingStoredHasNoRow() {
@@ -145,8 +161,7 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(1))
-        .body("pins.image", everyItem(not(equalTo("qits/project-agent"))));
+        .body("pins.size()", equalTo(0));
 
     // Put it back: the other test asserts the whole list, and the suite shares one database.
     put("qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", AGENT_VERSION);
@@ -187,7 +202,7 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(3))
+        .body("pins.size()", equalTo(2))
         // qits/api-declared sorts ahead of every authored image, so the declared row is first — one
         // order over the merged list, not the authored ones followed by the declared ones.
         .body("pins[0].image", equalTo("qits/api-declared"))
@@ -212,7 +227,7 @@ class ImagePinsApiTest {
         .get(BASE + "/pins")
         .then()
         .statusCode(200)
-        .body("pins.size()", equalTo(2))
+        .body("pins.size()", equalTo(1))
         .body(
             "pins.image",
             everyItem(not(equalTo("qits/api-declared"))));

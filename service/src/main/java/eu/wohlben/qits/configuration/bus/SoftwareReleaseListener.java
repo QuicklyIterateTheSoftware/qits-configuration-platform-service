@@ -64,9 +64,12 @@ import org.jboss.logging.Logger;
  * is matched unqualified.
  *
  * <p>The name match is exact and <b>whole, never a prefix</b>, on both halves: a map lookup on the
- * authored side, an indexed equality on the declared one. That is load-bearing now that {@code
- * qits/workspace} and {@code qits/workspace-editor} share an opening — they are two images with pins
- * of their own, and a release of either must move its own keys and only its own.
+ * authored side, an indexed equality on the declared one. The case that established it was {@code
+ * qits/workspace} and {@code qits/workspace-editor}, which share an opening and each had pins of
+ * their own, so a release of either would have moved the other's keys under a prefix match. Neither
+ * is pinned here any more — both consumers took the version into their own poms in September 2026 —
+ * and the rule outlives them: a released name that merely opens with a pinned image's name is a
+ * different image, whether or not two images in the list happen to collide this month.
  *
  * <h2>THE FAN-OUT: one write per env, because an entry is an override</h2>
  *

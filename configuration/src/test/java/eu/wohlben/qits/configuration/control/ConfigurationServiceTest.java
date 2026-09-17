@@ -369,6 +369,10 @@ class ConfigurationServiceTest {
 
     configuration.upsert(ENV,
         "qits-projects", "env.QITS_PROJECTS_AGENT_IMAGE_VERSION", "2026.904.160152", "alice");
+    // AND AN ENTRY NO MAPPING NAMES, written deliberately: env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION
+    // was an authored pin until 2026-09-17 and the residue of it is still in real stores, because
+    // nothing here deletes an entry. It must not be reported — the report is about what is
+    // launchable-by-configuration, and that version is qits-projects' pom's business now.
     configuration.upsert(ENV,
         "qits-projects", "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION", "2026.904.160522", "alice");
 
@@ -378,14 +382,10 @@ class ConfigurationServiceTest {
                 "qits/project-agent",
                 "2026.904.160152",
                 "qits-projects",
-                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
-            new ImagePinDto(
-                "qits/workspace",
-                "2026.904.160522",
-                "qits-projects",
-                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
+                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
         configuration.imagePins(),
-        "both authored mappings, each with the version its entry holds");
+        "the one authored mapping, with the version its entry holds — and nothing for the stored"
+            + " entry no mapping names any more");
 
     // A CONSUMER NOBODY HAS EVER WRITTEN A PIN FOR, arriving through its own declaration: an
     // application says which image its version key carries, and the report answers for it with
@@ -415,14 +415,9 @@ class ConfigurationServiceTest {
                 "qits/project-agent",
                 "2026.904.160152",
                 "qits-projects",
-                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION"),
-            new ImagePinDto(
-                "qits/workspace",
-                "2026.904.160522",
-                "qits-projects",
-                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
+                "env.QITS_PROJECTS_AGENT_IMAGE_VERSION")),
         configuration.imagePins(),
-        "the declared image joins the authored ones in the one order the contract names — and the"
+        "the declared image joins the authored one in the one order the contract names — and the"
             + " binary coordinate stays out of a report about container images");
 
     // AND A CONSUMER ADOPTING DECLARATIONS FOR A KEY THAT IS ALREADY AUTHORED: qits-projects now
@@ -440,7 +435,7 @@ class ConfigurationServiceTest {
 
     List<ImagePinDto> shadowed = configuration.imagePins();
     assertEquals(
-        3, shadowed.size(), "a declaration of an authored pair replaces its row rather than adding one");
+        2, shadowed.size(), "a declaration of an authored pair replaces its row rather than adding one");
     assertTrue(
         shadowed.contains(
             new ImagePinDto(
@@ -456,29 +451,30 @@ class ConfigurationServiceTest {
     // TWO TIERS, TWO VERSIONS, TWO ROWS. The report is the UNION over envs, because its consumer is
     // deciding what it may delete out of one registry the whole platform shares: a version running
     // in a tier this report did not look at is a tag collected out from under a running container.
+    //
+    // Told against the DECLARED mapping since 2026-09-17. It used to be told against a second
+    // authored pin, and there is no second authored pin any more; the property is the report's and
+    // has nothing to do with which half a mapping came out of, which is the whole point of merge().
+    // The one authored pair is spoken for by the same-version case below.
     configuration.upsert(
-        OTHER_ENV,
-        "qits-projects",
-        "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION",
-        "2026.905.9",
-        "alice");
+        OTHER_ENV, "app-declared-pin", "env.QITS_DECLARED_IMAGE_VERSION", "2026.905.9", "alice");
 
     List<ImagePinDto> across = configuration.imagePins();
     assertTrue(
         across.contains(
             new ImagePinDto(
-                "qits/workspace",
-                "2026.904.160522",
-                "qits-projects",
-                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
+                "qits/declared",
+                "2026.905.1",
+                "app-declared-pin",
+                "env.QITS_DECLARED_IMAGE_VERSION")),
         "the version one tier holds is kept");
     assertTrue(
         across.contains(
             new ImagePinDto(
-                "qits/workspace",
+                "qits/declared",
                 "2026.905.9",
-                "qits-projects",
-                "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION")),
+                "app-declared-pin",
+                "env.QITS_DECLARED_IMAGE_VERSION")),
         "and so is the version the other tier holds");
 
     // The same version in both tiers is ONE fact about the registry, not two: the wire shape has no
