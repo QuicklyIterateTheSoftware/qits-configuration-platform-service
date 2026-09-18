@@ -336,10 +336,10 @@ Five things about it are easy to undo:
   under test). A packaged process cannot be handed a build-time key; it would silently take the
   default.
 - **The story classes are opted in by NAME, not by `skipITs`.** The root pom keeps `skipITs=true`,
-  because failsafe has one run per module and half of `PackagedSurfaceIT` is about the SPA, which the
-  userflow step deliberately does not build (`-Dquarkus.quinoa=false`). The list is spelled in the
-  non-gating step of `.config/qits/ci-event-release-request.yml` and repeated under § Userflows
-  below; **a new story class has to be added to it**, or it is written and never run.
+  because failsafe has one run per module and half of `PackagedSurfaceIT` is about the SPA, which
+  the userflow step deliberately does not build (`-Dquarkus.quinoa=false`). The list is spelled in
+  the last step of the release-request phase of `.config/qits/release.yml` and repeated under §
+  Userflows below; **a new story class has to be added to it**, or it is written and never run.
 
 ## Userflows
 
@@ -454,7 +454,10 @@ half about the SPA, so the opt-in is per-run and per-class. The class orderer is
 Quarkus permits — the `junit.quarkus.orderer.secondary-orderer` line in `service`'s test properties; a
 local `junit-platform.properties` hard-fails surefire.
 
-The non-gating step of `.config/qits/ci-event-release-request.yml` publishes the reports as the docs
-bundle `@userflows/qits-configuration`, once per release-request fold — per-push CI is retired and
-there is nothing to run per commit. It carries `gating: false` **by design**: a red story fails the
-run and shows red, but does not hold the request's build gate. It runs exactly the list above.
+The last step of the release-request phase of `.config/qits/release.yml` (composed from its
+archetype) publishes the reports as the docs bundle `@userflows/qits-configuration`, once per
+release-request fold — per-push CI is retired and there is nothing to run per commit. It **gates,
+like every other step**: a red story is a red verdict for the whole fold. A run carries ONE verdict,
+never one per step, so the `gating: false` this step used to declare would only have erased the
+earlier steps' pass and parked the request on "Waiting for a gating CI verdict". It runs exactly the
+list above.
