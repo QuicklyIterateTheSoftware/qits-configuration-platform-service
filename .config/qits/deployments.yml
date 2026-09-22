@@ -60,7 +60,7 @@ routes: /configuration
 # in the same change — this file, qits-githost, qits-ci, qits-artifacts and qits-workspaces, one line
 # each. The order is stated in integers rather than left to the edge's position-then-label tie-break
 # so that renaming a row cannot silently reorder the group.
-navigation-entries: services.details.Configuration:7, daemons.details.Configuration:7
+navigation-entries: services.details.Configuration:7, daemons.details.Configuration:7, apps.details.Configuration:7
 
 # TWO STORES, DECLARED RATHER THAN CONFIGURED. This deployable now joins two jars that each own a
 # store: the configuration jar, and qits-eventstream (this service consumes the SoftwareRelease
