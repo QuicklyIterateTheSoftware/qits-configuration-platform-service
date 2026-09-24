@@ -12,7 +12,6 @@ import eu.wohlben.qits.configuration.entity.ConfigurationEntry;
 import eu.wohlben.qits.configuration.entity.ConfigurationRevision;
 import eu.wohlben.qits.configuration.error.BadRequestException;
 import eu.wohlben.qits.configuration.error.NotFoundException;
-import eu.wohlben.qits.configuration.error.UnprocessableEntityException;
 import eu.wohlben.qits.configuration.mapper.ConfigurationMapper;
 import eu.wohlben.qits.configuration.persistence.ConfigurationDeclarationRepository;
 import eu.wohlben.qits.configuration.persistence.ConfigurationEntryRepository;
@@ -48,8 +47,8 @@ import java.util.UUID;
  * values it layers on top are still bytes it never looked at.
  *
  * <p><b>An entry is addressed by (env, application, key), and every method here takes the env
- * first.</b> This service runs on the platform plane and holds every environment's configuration in
- * one store, so there is no "the" configuration of an application — there is dev's and there is
+ * first.</b> One instance of this service holds every environment's configuration in one store, so
+ * there is no "the" configuration of an application — there is dev's and there is
  * prod's, and a method that let a caller omit which one it meant would be the one place the two
  * could be confused. There is no overload here that omits it, and the env-less API routes that once
  * supplied one configured env on a caller's behalf are gone.
@@ -213,7 +212,7 @@ public class ConfigurationService {
    *   <li>{@code serviceAddress} — rendered here and NOT overridable. A stored row on such a key is
    *       ignored for the value and reported orphaned by the entries read; the address is a fact
    *       about the platform's own topology, and letting an operator pin it by hand is how a
-   *       container survives a plane move by pointing at where the service used to be.
+   *       container survives an address change by pointing at where the service used to be.
    *   <li>{@code packageVersion} — nothing unless an entry exists. There is no default by design:
    *       the version is whatever a release put there, and a fallback is a container started on a tag
    *       nobody shipped.
@@ -265,47 +264,26 @@ public class ConfigurationService {
   /**
    * One serviceAddress key, turned into the URL a container in {@code env} can actually dial.
    *
-   * <p><b>The host is the deployer's WIRE ALIAS, and which alias depends on the addressed
-   * application's own plane.</b> A platform-plane application answers at its bare application name
-   * ({@code qits-events}) from every environment at once; an environment-plane one answers at {@code
-   * <env>-<application>} ({@code dev-qits-ci}), once per tier. That is {@code PdNetworks.alias}
-   * restated on this side, and it is restated rather than derived from the name — nothing about the
-   * string {@code qits-events} says which plane it is on, which is exactly why the plane is a
-   * recorded fact and not an inference.
+   * <p><b>The host is the deployer's WIRE ALIAS, and there is only one shape of it: {@code
+   * <env>-<application>}.</b> That is {@code PdNetworks.alias} restated on this side, and it is now
+   * a derivation rather than a lookup.
    *
-   * <p><b>A target that has never declared is a 422 naming it, not a guess.</b> Either alias would
-   * be syntactically fine and one of them would be wrong, and a wrong alias is not an error anybody
-   * sees: it is a container that boots, passes its health gate and dials a name docker's DNS does not
-   * resolve, discovered by whoever is on call. The refusal moves that to the read, where the
-   * deployment has not happened yet.
+   * <p><b>This used to ask the addressed application which PLANE it was on.</b> A platform-plane
+   * application answered at its bare name from every environment at once, an environment-plane one
+   * at {@code <env>-<application>} once per tier, and nothing about the string {@code qits-events}
+   * said which — so the plane had to be a recorded fact, a target that had never declared one was a
+   * 422 naming it, and this method could not answer without reading the target's governing
+   * declaration. The plane is deleted: every application is an environment application in the one
+   * tier, so the question has a single answer and the lookup, the refusal and the branch go with it.
+   *
+   * <p>{@code deploymentTarget} survives on {@link ConfigurationDeclaration} as a recorded fact that
+   * nothing reads for addressing — the same RETIRED tolerance the deployer's spec parser keeps for
+   * the key, and for the same reason: a declaration is posted at a BUILT version, so older senders
+   * go on stating it forever.
    */
   private String renderAddress(
       String env, String application, ConfigurationDeclaredKey declared) {
-    ConfigurationDeclaration target =
-        declarations
-            .governingOf(declared.serviceRef)
-            .orElseThrow(
-                () ->
-                    new UnprocessableEntityException(
-                        "Key "
-                            + declared.declaredKey
-                            + " of application "
-                            + application
-                            + " addresses "
-                            + declared.serviceRef
-                            + ", which has not declared its deployment plane. The address depends on"
-                            + " it — a platform-plane service answers at `"
-                            + declared.serviceRef
-                            + "` and an environment-plane one at `"
-                            + env
-                            + "-"
-                            + declared.serviceRef
-                            + "` — and a guess here is a container dialling the void."));
-    String alias =
-        ConfigurationKeys.TARGET_PLATFORM.equals(target.deploymentTarget)
-            ? declared.serviceRef
-            : env + "-" + declared.serviceRef;
-    return "http://" + alias + ":" + declared.servicePort;
+    return "http://" + env + "-" + declared.serviceRef + ":" + declared.servicePort;
   }
 
   /**

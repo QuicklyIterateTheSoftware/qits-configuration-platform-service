@@ -653,15 +653,17 @@ class ConfigurationServiceTest {
   }
 
   /**
-   * THE PLANE DECIDES THE HOSTNAME, and this is the test that pins which one.
+   * THE ENVIRONMENT DECIDES THE HOSTNAME, AND NOTHING ELSE DOES, and this is the test that pins it.
    *
-   * <p>A platform-plane service answers at its bare application name from every environment at once;
-   * an environment-plane one answers at {@code <env>-<application>}. That is the deployer's
-   * {@code PdNetworks.alias} and the reason the plane is a recorded fact rather than something
-   * inferred from the name — nothing about the string {@code qits-events} says which side it is on.
+   * <p>Every peer answers at {@code <env>-<application>} — the deployer's {@code PdNetworks.alias},
+   * restated. The first target here still RECORDS {@code deployment_target: platform}, because the
+   * key is a retired tolerance that older senders go on stating forever, and that is exactly the
+   * point of asserting against it: a declaration saying `platform` must render the same address as
+   * one saying `environment`. While the plane existed it rendered the bare name instead, so this
+   * assertion fails the moment anybody reintroduces the branch.
    */
   @Test
-  void aServiceAddressRendersAgainstTheADDRESSEDApplicationsOwnPlane() {
+  void aServiceAddressRendersAgainstTheENVIRONMENTWhateverThePlaneTheTargetRecorded() {
     declare("app-plane-platform", ConfigurationKeys.TARGET_PLATFORM, "keys: {}\n");
     declare("app-plane-env", ConfigurationKeys.TARGET_ENVIRONMENT, "keys: {}\n");
     String version =
@@ -684,13 +686,13 @@ class ConfigurationServiceTest {
         configuration.resolve(ENV, "app-addresser", Optional.of(version)).properties();
 
     assertEquals(
-        "http://app-plane-platform:8080",
+        "http://" + ENV + "-app-plane-platform:8080",
         properties.get(property("app-addresser", "env.QITS_PLATFORM_URL")),
-        "a platform-plane peer is reached at its bare alias from every environment");
+        "a target whose declaration still says `platform` is addressed like every other one");
     assertEquals(
         "http://" + ENV + "-app-plane-env:9090",
         properties.get(property("app-addresser", "env.QITS_TIER_URL")),
-        "an environment-plane peer is reached at <env>-<application>");
+        "and so is one that says `environment` — there is one shape of alias now");
     assertEquals(
         "http://other-app-plane-env:9090",
         configuration
@@ -724,13 +726,13 @@ class ConfigurationServiceTest {
         "bootstrap");
 
     assertEquals(
-        "http://app-rendered-target:8080",
+        "http://" + ENV + "-app-rendered-target:8080",
         configuration
             .resolve(ENV, "app-rendered", Optional.of(version))
             .properties()
             .get(property("app-rendered", "env.QITS_URL")),
-        "the rendered address wins: a hand-pinned one is how a container survives a plane move by"
-            + " pointing at where the service used to be");
+        "the rendered address wins: a hand-pinned one is how a container survives an address change"
+            + " by pointing at where the service used to be");
 
     ConfigurationEntryDto view = configuration.entryViews(ENV, "app-rendered").get(0);
     assertTrue(
@@ -738,8 +740,22 @@ class ConfigurationServiceTest {
         "and the row says so, rather than sitting in the store looking like it is in effect");
   }
 
+  /**
+   * AN ADDRESS INTO AN APPLICATION THAT HAS NEVER DECLARED IS ANSWERED, not refused.
+   *
+   * <p>It used to be a 422. The refusal existed for exactly one reason — the address depended on the
+   * addressed application's PLANE, either alias was syntactically fine and a guess would have been a
+   * container that booted, passed its health gate and dialled a name DNS does not resolve. With one
+   * shape of alias there is nothing left to guess: the answer is derived from the env and the name,
+   * both of which the caller already supplied, so a target that has declared nothing is not a
+   * question this read has to ask anybody.
+   *
+   * <p>That is a real unblocking and not only a tidy-up: five of the nine former platform services
+   * have no governing declaration on the live platform at all, so every serviceAddress into one of
+   * them was a 422 waiting for its first consumer.
+   */
   @Test
-  void anAddressIntoAnApplicationWithNoDeclaredPlaneIsRefusedRatherThanGuessed() {
+  void anAddressIntoAnApplicationThatNeverDeclaredIsRenderedRatherThanRefused() {
     String version =
         declare(
             "app-void",
@@ -752,17 +768,13 @@ class ConfigurationServiceTest {
                 port: 8080
             """);
 
-    UnprocessableEntityException failure =
-        assertThrows(
-            UnprocessableEntityException.class,
-            () -> configuration.resolve(ENV, "app-void", Optional.of(version)));
-    assertEquals(422, failure.statusCode());
-    assertTrue(
-        failure.getMessage().contains("app-never-declared"),
-        "the refusal names the application that has not declared: " + failure.getMessage());
-    assertTrue(
-        failure.getMessage().contains("deployment plane"),
-        "and what is missing about it: " + failure.getMessage());
+    assertEquals(
+        "http://" + ENV + "-app-never-declared:8080",
+        configuration
+            .resolve(ENV, "app-void", Optional.of(version))
+            .properties()
+            .get(property("app-void", "env.QITS_URL")),
+        "the address needs nothing from the target's own declaration");
   }
 
   @Test

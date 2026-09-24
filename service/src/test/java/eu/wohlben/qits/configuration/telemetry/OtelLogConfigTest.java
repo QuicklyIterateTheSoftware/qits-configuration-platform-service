@@ -55,9 +55,15 @@ class OtelLogConfigTest {
   void theExporterPointsAtTheReceiverOverHttpProtobuf() {
     // The SDK appends /v1/logs to this base, so it resolves to qits-observability's own ingest
     // route. gRPC is the Quarkus default and the receiver does not speak it.
+    //
+    // The HOST is derived from QITS_ENVIRONMENT now, so what this pins is the resolved value a
+    // surefire JVM gets — no such variable, hence the `dev` fallback, which is the environment this
+    // estate really runs. That the expression still FOLLOWS the variable is a claim this assertion
+    // cannot make (a flattened literal resolves identically here); DerivedEnvironmentAddressTest is
+    // where that is asserted, by supplying an environment nothing here has.
     assertEquals("http/protobuf", value("quarkus.otel.exporter.otlp.protocol"));
     assertEquals(
-        "http://qits-observability:8080/observability/api/otel",
+        "http://dev-qits-observability:8080/observability/api/otel",
         value("quarkus.otel.exporter.otlp.endpoint"));
   }
 }
