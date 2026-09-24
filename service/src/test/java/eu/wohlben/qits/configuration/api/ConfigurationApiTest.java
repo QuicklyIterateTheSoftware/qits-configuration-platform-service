@@ -374,9 +374,10 @@ class ConfigurationApiTest {
         .body("headRevision", greaterThan(0))
         .body(prefix + "env.QITS_UNSET'", equalTo("from-the-declaration"))
         .body(prefix + "env.QITS_SET'", equalTo("from-the-operator"))
-        // The address is rendered against api-bus's OWN plane, which is platform — so it is the
-        // bare alias, and it would be `<env>-api-bus` had api-bus declared `environment`.
-        .body(prefix + "env.QITS_BUS_URL'", equalTo("http://api-bus:8080"));
+        // The address is rendered against the ENV being read, and nothing else. api-bus declares
+        // `platform` — a retired value older senders still state — and gets the same `<env>-` alias
+        // every other application gets, because there is only one shape of alias now.
+        .body(prefix + "env.QITS_BUS_URL'", equalTo("http://" + ENV + "-api-bus:8080"));
 
     // Without the parameter the answer is the entries and nothing else. The deployer does not pass
     // a version yet, and this is the assertion that it keeps getting exactly what it gets today.
