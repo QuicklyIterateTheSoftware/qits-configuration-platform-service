@@ -1,39 +1,3 @@
-# How qits-platform-deployments deploys this repo. It reads this file from the git host at the built
-# sha, so the answer travels with the commit.
-#
-# CARRYING THE FILE AT ALL is the other thing it says. qits-workspaces reads it on a release to
-# decide whether this repository deploys — a library or an SPA carries none and its release is the
-# trunk push alone — and then promotes onto the branch it is configured with.
-#
-# PLATFORM service: ONE instance, holding EVERY environment's configuration side by side.
-#
-# This file used to argue the opposite — that two tiers sharing one configuration store would make
-# an edit in dev an edit in prod — and that argument was about a schema, not about a plane. An entry
-# was (application, key) then, so the only thing separating dev's value from prod's was which
-# process you happened to be talking to, and one store really would have been one value. An entry is
-# (env, application, key) now: the unique constraint says so, env is a path segment on every route,
-# and an edit names the environment it edits. The separation moved from the deployment into the key,
-# where it can be seen in a diff.
-#
-# WHAT THE SHARED STORE BUYS, and it is not tidiness. Cross-env tracing: "what does prod set that
-# dev does not" is a query against one database rather than two browser tabs and a person comparing
-# by eye. Free defaults for a joining environment: a new tier starts from what its siblings already
-# say instead of from an empty table nobody remembers how to fill. And one deployment of the service
-# every other deployment on the platform waits for — the deployer's resolved read now has one
-# address rather than one per tier.
-#
-# THE ROLLOUT COUPLING IT USED TO HAVE IS GONE, and it is worth saying so where it was written down:
-# V2 backfilled the env column from QITS_CONFIGURATION_LEGACY_ENV, which shipped with no default, so
-# an instance not handed that variable died at migrate-at-start. That refusal was the design while
-# there were inherited rows to stamp; a freshly bootstrapped platform has none, and the requirement
-# only ever failed cold boots. The placeholder is a literal now — see
-# META-INF/microprofile-config.properties — and this deployment needs no such variable.
-#
-# `deployment_target` is written out here rather than left to its default because this is the one
-# key a reader of this file will want to check first, and the answer is a decision rather than an
-# omission.
-deployment_target: platform
-
 # WHAT THIS REPOSITORY DEPLOYS AS, held still across the repository rename. The repository is
 # qits-configuration-platform-service now; the application is still qits-configuration, so nothing that is
 # running moves: the swarm service and its wire alias, the container, the image
