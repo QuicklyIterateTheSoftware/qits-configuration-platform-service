@@ -147,9 +147,11 @@ public class ConfigurationController {
    * <p><b>Each row carries {@code orphaned}</b>, decided against the application's governing
    * declaration: true when that declaration does not account for the key, or declares it a
    * serviceAddress whose stored value is ignored in favour of the rendered address. It is computed
-   * at read time and nothing is written or removed — an orphan is usually a key the next deployment
-   * drops and sometimes a key somebody set early for a version not released yet, and a store that
-   * tidied away the second kind would be a store nobody could stage a change in.
+   * at read time and is a question for a person, never a reason to delete — an orphan is usually a
+   * key the next deployment drops and sometimes a key somebody set early for a version not released
+   * yet, and a store that tidied away the second kind would be a store nobody could stage a change
+   * in. The strict subset that IS collected — retired keys no serving or rollback version declares —
+   * goes through {@link GcController}, on the deployer's pins.
    */
   @GET
   @Path("/{application}/envs/{env}/entries")

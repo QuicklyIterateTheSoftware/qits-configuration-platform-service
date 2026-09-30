@@ -290,10 +290,13 @@ public class ConfigurationService {
    * One application's current entries in one env, as wire shapes, with {@code orphaned} decided
    * against the governing declaration.
    *
-   * <p>Read-only in every sense: an orphan is reported and never cleaned up. A key the current
-   * declaration does not account for is usually a key the NEXT deployment removes and sometimes a
-   * key somebody set early for a version not released yet, and a store that deleted the second kind
-   * to tidy up the first would be a store nobody could stage a change in.
+   * <p>Read-only in every sense: the flag is a question for a person, and nothing deletes a row
+   * because it carries it. A key the current declaration does not account for is usually a key the
+   * NEXT deployment removes and sometimes a key somebody set early for a version not released yet,
+   * and a store that deleted the second kind to tidy up the first would be a store nobody could
+   * stage a change in. What IS collected is a strict subset decided on other evidence — a retired
+   * key that no serving or rollback version declares — by {@link RetiredEntryCollector}, through
+   * its own door.
    */
   public List<ConfigurationEntryDto> entryViews(String env, String application) {
     String environment = ConfigurationKeys.requireEnv(env);
@@ -512,10 +515,29 @@ public class ConfigurationService {
    * the value that was removed, which is what makes an accidental delete answerable.
    */
   public void delete(String env, String application, String key, String actor) {
+    remove(env, application, key, null, actor);
+  }
+
+  /**
+   * THE COLLECTOR'S DELETE: the same removal as {@link #delete}, refused when the entry has moved
+   * since it was judged.
+   *
+   * <p>{@code RetiredEntryCollector} decides on a read and deletes afterwards, and a write landing in
+   * between is exactly the staged value its rule exists to keep. So the head revision it judged is
+   * compared inside the bracket, and a moved entry is left alone and answered {@code false}.
+   */
+  public boolean deleteIfUnchanged(
+      String env, String application, String key, long judgedHeadRevision, String actor) {
+    return remove(env, application, key, judgedHeadRevision, actor);
+  }
+
+  /** Both deletes: a deleted revision appended and the head row taken away, in one bracket. */
+  private boolean remove(
+      String env, String application, String key, Long expectedHeadRevision, String actor) {
     String environment = ConfigurationKeys.requireEnv(env);
     String app = ConfigurationKeys.requireApplication(application);
     String entryKey = ConfigurationKeys.requireKey(key);
-    DbRetry.runInNewTx(
+    return DbRetry.inNewTx(
         "remove " + environment + "/" + ExtrasProperties.propertyName(app, entryKey),
         () -> {
           ConfigurationEntry existing =
@@ -530,9 +552,13 @@ public class ConfigurationService {
                                   + app
                                   + " in env "
                                   + environment));
+          if (expectedHeadRevision != null && existing.headRevision != expectedHeadRevision) {
+            return false;
+          }
           append(environment, app, entryKey, null, true, actor);
           entries.delete(existing);
           entries.flush();
+          return true;
         });
   }
 

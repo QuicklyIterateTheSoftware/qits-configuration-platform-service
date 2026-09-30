@@ -18,6 +18,15 @@ public class DeclaredKeyRepository
   }
 
   /**
+   * Every key every live version of one application declares — the entry collector's read, which
+   * judges a key against all of an application's declarations at once and would otherwise ask this
+   * once per version.
+   */
+  public List<ConfigurationDeclaredKey> listByApplication(String application) {
+    return list("application = ?1 order by version, declaredKey", application);
+  }
+
+  /**
    * THE REVERSE QUESTION: every declared key that carries a version of one package.
    *
    * <p>It is the question qits-artifacts' collector asks — "who runs a version of {@code

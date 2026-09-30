@@ -93,6 +93,13 @@ every boot would silently revert an operator's fix to a live environment. A `ser
 outside the ladder entirely — it is rendered on every read, a `PUT` on one is a 400, and a stored row
 on one is reported `orphaned`.
 
+**`orphaned` is a question for a person, and nothing deletes on it.** An orphan is often a key the
+next deployment drops, and sometimes one set early for a version not released yet. What *is*
+collected is a strict subset: `POST /gc/entries` takes qits-deployments' pins and removes the entries
+of **retired** keys — declared once, and stated by no pinned version, no version received after the
+newest pinned one, and not written since the newest declaration arrived. Each removal is an ordinary
+delete, value kept in the history; the report never carries a value.
+
 ## The API
 
 Everything under `/configuration/api`. Every route accepts `qits:admin` (a person, through
@@ -114,6 +121,7 @@ no anonymous route.
 | `GET /applications/{app}/envs/{env}/history` | every revision of that env, newest first |
 | `POST /import?env=` | `text/plain`, an extras properties file whole, into the env the caller names. Idempotent; answers `{imported, unchanged, kept, ignored}` |
 | `GET /pins` | the configured container-image versions — `{generatedAt, pins:[{image, version, application, key}]}` |
+| `POST /gc/entries` | **the entry collector**, `{dryRun, deployments}` with `deployments` the body of qits-deployments' `GET /deployments/api/pins`, verbatim. Answers `{dryRun, examined, removed:[{application, env, key, reason, lastDeclaredBy}], kept:{…per reason}, errors}`; missing pins are a 400 that deletes nothing. `qits:admin` or `qits:system` |
 | `POST /applications/{app}/declarations/{version}?deploymentTarget=` | `application/yaml`, the document raw. **`qits:system` + `MachineAuth`.** 201 new, 200 identical, 409 different-under-a-taken-version, 422 unreadable |
 | `DELETE /applications/{app}/declarations/{version}` | the tag-recovery door. **`qits:system` + `MachineAuth`.** 204; the previous version governs again |
 | `GET /applications/{app}/declarations` | every version declared, newest first, with the governing one flagged |

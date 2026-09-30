@@ -7,6 +7,7 @@ import eu.wohlben.qits.configuration.dto.ConfigurationRevisionDto;
 import eu.wohlben.qits.configuration.dto.DeclarationDto;
 import eu.wohlben.qits.configuration.dto.DeclarationSummaryDto;
 import eu.wohlben.qits.configuration.dto.DeclaredKeyDto;
+import eu.wohlben.qits.configuration.dto.EntryCollectionReportDto;
 import eu.wohlben.qits.configuration.dto.ImagePinDto;
 import eu.wohlben.qits.configuration.dto.ImportSummaryDto;
 import eu.wohlben.qits.configuration.dto.ResolvedConfigurationDto;
@@ -35,6 +36,13 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
       ImagePinsController.ListPinsResponse.class,
       DeclarationsController.ListDeclarationsResponse.class,
       DeclarationsController.DeclareResponse.class,
+      GcController.CollectEntriesRequest.class,
+      GcController.CollectEntriesRequest.Deployments.class,
+      GcController.CollectEntriesRequest.Pin.class,
+      EntryCollectionReportDto.class,
+      EntryCollectionReportDto.Removed.class,
+      EntryCollectionReportDto.Kept.class,
+      EntryCollectionReportDto.Failure.class,
       ApplicationSummaryDto.class,
       // NESTED INSIDE ApplicationSummaryDto AND STILL LISTED. The application listing is a record
       // holding a list of these, and a type reached only through a generic type argument is exactly
