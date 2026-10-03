@@ -175,12 +175,9 @@ public class TokenValidationBootstrapIT {
       // the posture a deployed platform takes, and this story is where it is documented. Flipping
       // the derived key directly would prove the tenant and skip the seam.
       overrides.put("qits.auth.machine.required", "true");
-      // …and what the gate needs beside it. qits-auth-core's MachineAuth refuses to start with the
-      // gate on and no audience configured, and the shipped properties no longer carry one: the
-      // audience a receiver cares about is quarkus.oidc.token.audience, which is a literal there.
-      // So the profile that turns the gate on is the profile that states this, and it states the
-      // same platform audience the tenant enforces.
-      overrides.put("qits.auth.machine.audience", PLATFORM_AUDIENCE);
+      // …and that is all the gate needs: qits-auth-core's MachineAuth defaults
+      // qits.auth.machine.platform-audience to "qits-platform", the same literal
+      // quarkus.oidc.token.audience enforces here, so there is nothing left to override.
       // The one seam this test MOVES: where the idp is. A runtime key, so the packaged artifact is
       // otherwise exactly what ships — discovery stays off and `jwks-path=jwks` is joined onto it.
       overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());

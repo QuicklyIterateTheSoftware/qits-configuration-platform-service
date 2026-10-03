@@ -319,9 +319,10 @@ every deployment on the platform.
 Five things about it are easy to undo:
 
 - **Its profile EXTENDS `PackagedSurfaceIT.PackagedUnderTarget`** rather than copying it — what a
-  launched qits-configuration needs in order to boot is one answer — and adds the gate (with the
-  `qits.auth.machine.audience` its startup check insists on, which the shipped properties do not
-  carry), the mock idp's address, the eventstream resource triple, and the bus pointed at a stub.
+  launched qits-configuration needs in order to boot is one answer — and adds the gate, the mock
+  idp's address, the eventstream resource triple, and the bus pointed at a stub.
+  `qits.auth.machine.platform-audience` needs no override here: it defaults to `qits-platform`, the
+  same literal `quarkus.oidc.token.audience` enforces.
 - **`PackagedWithMockIdp` is the ONE profile every story class shares**, which is what makes the
   whole catalogue one launched process and one embedded postgres instead of one per class. Every
   shared seam belongs in it; a second profile is a second boot, and — because `MockIdp` and the
