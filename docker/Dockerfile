@@ -62,37 +62,33 @@ RUN ./mvnw --version
 # anything that names the real cause. `.dockerignore` is what keeps this cheap.
 COPY . .
 
-# --- where the three qits jars come from ----------------------------------------------------------
+# --- where the three qits jars and Maven Central come from -----------------------------------------
 # This repo depends on qits-db-core (PatientPgDriver, DbRetry), qits-auth-core (the forward-auth
 # mechanism and the machine gate) and qits-arch-rules, which live only on the platform's own Maven
-# repository. That one IS reachable from a build: the CI recipe passes the address the step container
-# can use, and `.qits-maven-settings.xml` mirrors the `qits-maven` repository id onto it — an exact
-# id match, which is what gets past Maven's external:http:* blocker without permitting arbitrary HTTP
-# repositories. The ARG default is the developer-host address, so a plain host-side `docker build`
-# still works.
-ARG QITS_MAVEN_REPOSITORY_URL=http://registry.dev.localhost:8080/artifacts/maven/maven
-ENV QITS_MAVEN_REPOSITORY_URL=$QITS_MAVEN_REPOSITORY_URL
+# repository. Both platform hosts are code plus one input, the public domain:
+#
+#   https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven   hosted Maven (qits-artifacts)
+#   https://mirror.qits.$QITS_DOMAIN/mirror/maven/central      Maven Central cache (qits-mirror)
+#
+# The RUN below derives both and exports them for that RUN alone; `.qits-maven-settings.xml` reads
+# them as ${env.…}, mirroring the `qits-maven` repository id onto the first and Central onto the
+# second. The CI recipe passes QITS_DOMAIN; the default is the live platform's.
+ARG QITS_DOMAIN=wohlben.eu
 
-# --- and where Maven Central is mirrored, when it is ----------------------------------------------
-# The pipeline passes the platform's pull-through (qits-platform-mirror's central proxy, the same
-# authority the FROM lines above pull through); EMPTY — the default — means direct Maven Central.
-# `.qits-maven-settings.xml` activates its central-proxy profile only on a non-empty value, so a
-# bootstrap or hand build that passes nothing resolves exactly as it always did.
-ARG QITS_MAVEN_CENTRAL_URL=
-ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
-
-# --- and how Maven authenticates, once that repository stops answering anonymously -----------------
+# --- and how Maven authenticates ---------------------------------------------------------------------
+# Both hosts answer 401 anonymously, so every build that resolves through them needs a credential.
 # The two secret mounts put the CI run's commissioned client into THIS `RUN`'s environment and
 # nowhere else — not a layer, not the image history. That is why they are not build args: this image
 # is pullable, and a build arg is recorded where anyone who pulls it can read it.
-# `.qits-maven-settings.xml` reads the two variables as the `qits-maven-network` server.
+# `.qits-maven-settings.xml` presents them as the username and password of both mirrors.
 #
 # FILE FORM (`/run/secrets/<id>`, read into the command's own environment below), never the `env=`
 # mount form these two lines used to carry. `env=` needs a dockerfile frontend the BUILDER chooses,
 # and since the builds moved to the platform's buildkitd the frontend is the builder's to pick, not
 # this file's; the bare file mount is served identically by every frontend version. Absent secrets
-# leave both variables empty — `|| true` is every hand build's state — which the settings read
-# exactly as they read unset.
+# leave both variables empty — so a hand build without them still starts, and fails at the first 401
+# with Maven naming the host. Pass your own client to build by hand:
+# `--secret id=qits-client-id,env=… --secret id=qits-client-secret,env=…`.
 #
 # -Dnative flips quarkus.native.enabled (service/pom.xml carries its own `native` profile). Cap
 # native-image RAM so the build is deterministic on small machines.
@@ -110,15 +106,9 @@ ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
 # have to match the step container's node, because this stage does not build the bundle.
 #
 # service/src/main/webui is qits-spa-configuration, and it depends on @qits/ui-components. That
-# package exists ONLY on the platform's own npm registry (qits-artifacts). A RUN step in a docker
-# build reaches the public internet — Maven Central, npmjs.org, nodejs.org — and reaches the platform
-# registry by NO address: not the qits-net alias, not registry.dev.localhost:8080, not
-# host.docker.internal. So the install cannot happen here.
-#
-# It does not merely fail, it fails unreadably. The SPA commits an .npmrc pointing at the edge's
-# registry vhosts (right for a developer on the deployment host), npm ranks a project .npmrc above
-# ~/.npmrc, and npm's answer to a registry that never connects is `Exit handler never called!` — its
-# own internal-error text, naming neither the registry nor the address.
+# package exists ONLY on the platform's own npm registry — registry.qits.$QITS_DOMAIN, reachable
+# from a RUN step like any other public address, but it answers 401 without a credential, and this
+# stage is handed only the Maven one (see the ARG above). So the install cannot happen here.
 #
 # The bundle is therefore built BEFORE this image, by the pipeline step in
 # .config/qits/ci-post-receive.yml, which runs on qits-net where the registry is reachable, and
@@ -145,6 +135,8 @@ RUN --mount=type=secret,id=qits-client-id \
     --mount=type=secret,id=qits-client-secret \
     export QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)"; \
     export QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)"; \
+    export QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven"; \
+    export QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$QITS_DOMAIN/mirror/maven/central"; \
     d=service/src/main/webui/dist/qits-spa-configuration/browser; \
     test -f "$d/index.html" || { \
       echo "No built client SPA at $d." >&2; \

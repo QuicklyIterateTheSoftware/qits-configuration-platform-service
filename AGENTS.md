@@ -12,9 +12,10 @@ container.
 
 **The one thing it needs besides Maven Central** is the platform's own Maven repository, for
 `qits-db-core`, `qits-auth-core` and `qits-arch-rules`. `<repositories>` in the root pom points at
-`${qits.maven.repository.url}`; the image build overrides it through `.qits-maven-settings.xml`,
-which mirrors the exact repository id `qits-maven` — an exact id match is what gets past Maven's
-`external:http:*` blocker.
+`${qits.maven.repository.url}` (`https://registry.qits.wohlben.eu/artifacts/maven/maven` by
+default), which answers 401 without the commissioned client; the image build derives the same
+address from its `QITS_DOMAIN` build arg, and `.qits-maven-settings.xml` mirrors it onto the exact
+repository id `qits-maven`.
 
 **The gate is `./mvnw clean verify`**, and since the client landed it needs BOTH a node on PATH and
 `git submodule update --init` — `verify` runs `package`, and `package` is where Quinoa builds
