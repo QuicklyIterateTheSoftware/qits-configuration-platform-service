@@ -153,6 +153,11 @@ once per deployment *and* read by an operator; the writes are made by an operato
 bootstrap's import. A machine-only guard on either side would lock the other one out. There is no
 anonymous route here and there must never be one.
 
+**`qits:admin-agent` is admitted everywhere `qits:admin` is admitted, for now (qits-628
+follow-up)** — it is the role an ADMIN workspace's own coding-agent container carries, stated
+explicitly beside `qits:admin` at every one of those checks rather than inferred, so that a
+specific door can have it removed later without touching the others.
+
 **The exception is `api/DeclarationsController`'s POST and DELETE**, which take `qits:system` alone
 AND call `machineAuth.require()` — the injected bean, an instance method, the shape
 qits-platform-deployments' `PdServiceController` established. The distinction is not that a
