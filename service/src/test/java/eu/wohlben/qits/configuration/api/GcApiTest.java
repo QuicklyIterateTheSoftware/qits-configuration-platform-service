@@ -104,6 +104,37 @@ class GcApiTest {
         .body("dryRun", equalTo(true));
   }
 
+  /**
+   * {@code qits:admin-agent} is admitted everywhere {@code qits:admin} is (qits-628 follow-up): an
+   * ADMIN workspace's own agent, holding ONLY that role and neither {@code qits:admin} nor {@code
+   * qits:agent}, passes this write door exactly as a person would. A plain {@code qits:agent} stays
+   * refused, as {@link #anAgentIsRefusedAndTheSystemRoleIsAdmitted} already shows for this same
+   * route.
+   */
+  @Test
+  void anAdminAgentAloneIsAdmittedAndAgentAloneStaysRefused() {
+    Map<String, Object> harmless = Map.of("dryRun", true, "deployments", Map.of("pins", List.of()));
+    given()
+        .header("X-Qits-User", "dyn-admin-workspace-agent")
+        .header("X-Qits-Roles", "qits:admin-agent")
+        .contentType(ContentType.JSON)
+        .body(harmless)
+        .when()
+        .post(GC)
+        .then()
+        .statusCode(200)
+        .body("dryRun", equalTo(true));
+    given()
+        .header("X-Qits-User", "dyn-workspace-gc-agent-only")
+        .header("X-Qits-Roles", "qits:agent")
+        .contentType(ContentType.JSON)
+        .body(harmless)
+        .when()
+        .post(GC)
+        .then()
+        .statusCode(403);
+  }
+
   @Test
   void missingPinsAre400AndDeleteNothing() {
     put("gc-api-refused", "env.QITS_OLD", "x");
