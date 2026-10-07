@@ -155,7 +155,7 @@ public class DeclarationsController {
   @Operation(summary = "Every declaration of one application, newest first")
   @APIResponse(responseCode = "200", description = "The declarations")
   @APIResponse(responseCode = "400", description = "The application name is not valid")
-  @RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
   public ListDeclarationsResponse list(@PathParam("application") String application) {
     return new ListDeclarationsResponse(declarations.declarationsOf(application));
   }
@@ -167,7 +167,7 @@ public class DeclarationsController {
   @APIResponse(responseCode = "200", description = "The declaration")
   @APIResponse(responseCode = "400", description = "The application or version is not valid")
   @APIResponse(responseCode = "404", description = "No such declaration")
-  @RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
   public DeclarationDto get(
       @PathParam("application") String application, @PathParam("version") String version) {
     return declarations.declaration(application, version);

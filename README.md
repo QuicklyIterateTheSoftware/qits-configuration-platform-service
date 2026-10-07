@@ -111,6 +111,9 @@ while a declaration records an *asserted fact about a build*, which only the pip
 can honestly make. Every `GET` also accepts `qits:agent`, the role an agent holds on its own token. There is
 no anonymous route.
 
+`qits:admin-agent` — an ADMIN workspace's own coding-agent container — is admitted everywhere
+`qits:admin` is, for now (qits-628 follow-up).
+
 | route | what it answers |
 | --- | --- |
 | `GET /applications` | every configured application, with a row per env it is configured in — entry count and head revision each |
