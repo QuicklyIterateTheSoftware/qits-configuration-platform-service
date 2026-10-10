@@ -18,9 +18,8 @@ import org.junit.jupiter.api.Test;
  * to WITH an environment and WITHOUT one.</b>
  *
  * <p>Almost nothing about an address on this platform is a decision. Every application answers on
- * qits-net at {@code <environment>-<application>} — qits-platform-deployments' {@code
- * PdNetworks.alias}, which qualifies BOTH planes, so a platform service answers at {@code
- * <env>-qits-platform-idp} beside its bare name — and qits-deployments injects {@code
+ * qits-net at {@code <environment>-<application>} — so idp answers at {@code <env>-qits-idp} —
+ * and qits-deployments injects {@code
  * QITS_ENVIRONMENT} into every container it starts. So an alias plus a fixed path is a SPELLING this
  * process already holds both halves of, and the shipped defaults write it as {@code
  * ${QITS_ENVIRONMENT:dev}-…} instead of asking a configuration entry to carry it.
@@ -89,10 +88,9 @@ class DerivedEnvironmentAddressTest {
 
     // The `dev` fallback is not a placeholder: it is the environment this estate runs, so a clone,
     // a `quarkus:dev` and a deployment that somehow lost the variable all name an address that
-    // really answers here. The application is NOT renamed by the qualification — qits-platform-idp
-    // keeps that name and becomes dev-qits-platform-idp, never dev-qits-idp.
+    // really answers here.
     assertEquals(
-        "http://dev-qits-platform-idp:8080/idp", value(config, "quarkus.oidc.auth-server-url"));
+        "http://dev-qits-idp:8080/idp", value(config, "quarkus.oidc.auth-server-url"));
     assertEquals("http://dev-qits-observability:8080", value(config, "qits.observability.url"));
     assertTrue(
         config
@@ -111,7 +109,7 @@ class DerivedEnvironmentAddressTest {
     // addresses moved with it. qits-deployments injects QITS_ENVIRONMENT into every container it
     // starts, so this is the shape every non-dev deployment really runs on.
     assertEquals(
-        "http://staging-qits-platform-idp:8080/idp", value(config, "quarkus.oidc.auth-server-url"));
+        "http://staging-qits-idp:8080/idp", value(config, "quarkus.oidc.auth-server-url"));
     assertEquals("http://staging-qits-observability:8080", value(config, "qits.observability.url"));
   }
 

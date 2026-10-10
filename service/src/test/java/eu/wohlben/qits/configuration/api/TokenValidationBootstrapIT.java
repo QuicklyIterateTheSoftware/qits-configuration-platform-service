@@ -30,11 +30,11 @@ import org.junit.jupiter.api.TestMethodOrder;
  * the OIDC tenant <b>on</b>, which no {@code @QuarkusTest} here can prove. The shipped tenant is
  * gated: {@code quarkus.oidc.tenant-enabled=${qits.auth.machine.required:false}}, and every suite in
  * this repository leaves that gate shut — deliberately, because a clone-alone {@code ./mvnw verify}
- * must need no issuer at all. So the block this service actually deploys with (auth-server-url plus
- * {@code jwks-path=jwks} against a real listener, {@code quarkus.oidc.token.audience} enforcement,
+ * must need no issuer at all. So the block this service actually deploys with (auth-server-url with
+ * discovery against a real listener, {@code quarkus.oidc.token.audience} enforcement,
  * the {@code groups} claim becoming roles) is exercised nowhere else. The far side is {@link
- * MockIdp}, whose recordings make the interaction assertable on <b>both ends</b>: it serves a real
- * JWKS for a generated keypair, mints RS256 bearers signed by it — and, on demand, by a key it never
+ * MockIdp}, whose recordings make the interaction assertable on <b>both ends</b>: it serves a
+ * discovery document and a real JWKS for a generated keypair, mints RS256 bearers signed by it — and, on demand, by a key it never
  * published — and records what it answered.
  *
  * <p><b>Why this service in particular.</b> qits-configuration is the platform's config store, and
@@ -179,7 +179,7 @@ public class TokenValidationBootstrapIT {
       // qits.auth.machine.platform-audience to "qits-platform", the same literal
       // quarkus.oidc.token.audience enforces here, so there is nothing left to override.
       // The one seam this test MOVES: where the idp is. A runtime key, so the packaged artifact is
-      // otherwise exactly what ships — discovery stays off and `jwks-path=jwks` is joined onto it.
+      // otherwise exactly what ships — discovery reads the mock's document and follows its jwks_uri.
       overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
       // THE BUS IS LIT, and pointed at a stub, because one of this service's user stories is about
       // it. %dev and %test darken it (a clone-alone build has no qits-events on the far side), but a
@@ -243,9 +243,8 @@ public class TokenValidationBootstrapIT {
   @UserStoryDescription(
       """
       A freshly deployed qits-configuration must validate service bearers before any caller
-      arrives: at startup it fetches the signing keys (JWKS) from qits-platform-idp — discovery
-      stays off, the path is configured — so the very first machine request is judged on the
-      platform's own keys. qits-platform-deployments reads this service with exactly that
+      arrives: at startup it reads qits-idp's discovery document and fetches the signing keys
+      (JWKS) it names, so the very first machine request is judged on the platform's own keys. qits-platform-deployments reads this service with exactly that
       credential, once per deployment, to learn what a container starts with.
       """)
   @Order(1)
@@ -256,9 +255,13 @@ public class TokenValidationBootstrapIT {
         "qits-configuration starts with the OIDC tenant on, beside a reachable qits-platform-idp");
     given().get("/configuration/q/health/ready").then().statusCode(200);
 
-    // End (a), the idp side: the JWKS was served during startup — before this story presented any
-    // token at all. That is the claim a status code could never make, and it is only assertable
-    // because the mock records what it answered.
+    // End (a), the idp side: the discovery document and the JWKS were served during startup —
+    // before this story presented any token at all. That is the claim a status code could never
+    // make, and it is only assertable because the mock records what it answered.
+    assertTrue(
+        idp.recordedRequests().stream()
+            .anyMatch(r -> "/idp/.well-known/openid-configuration".equals(r.path())),
+        "the packaged service never read the discovery document at startup");
     assertTrue(
         idp.recordedRequests().stream().anyMatch(r -> "/idp/jwks".equals(r.path())),
         "the packaged service never fetched /idp/jwks at startup");
@@ -358,6 +361,13 @@ public class TokenValidationBootstrapIT {
     // because it is the first one that ran (see the class javadoc on ordering).
     ReportAssertions.assertEdge(
         CATEGORY, ACCEPTED_SLUG, "http", SERVICE, MockIdp.SERVICE_NAME, "GET /idp/jwks -> 200");
+    ReportAssertions.assertEdge(
+        CATEGORY,
+        ACCEPTED_SLUG,
+        "http",
+        SERVICE,
+        MockIdp.SERVICE_NAME,
+        "GET /idp/.well-known/openid-configuration -> 200");
     // Observed on the near side, by the filter, with the actor this story set.
     ReportAssertions.assertEdge(
         CATEGORY, ACCEPTED_SLUG, "http", DEPLOYER, SERVICE, "GET " + GUARDED_ROUTE + " -> 200");
