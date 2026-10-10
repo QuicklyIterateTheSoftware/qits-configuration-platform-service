@@ -4,18 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import au.com.dius.pact.core.model.DefaultPactWriter;
-import au.com.dius.pact.core.model.PactSpecVersion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import eu.wohlben.qits.pact.consumer.ConsumerPact;
-import eu.wohlben.qits.pact.consumer.GoldenFiles;
 import eu.wohlben.qits.pact.consumer.GoldenInteraction;
 import eu.wohlben.qits.pact.consumer.GoldenMasters;
 import eu.wohlben.qits.pact.consumer.Trigger;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -48,7 +42,8 @@ class IdpConsumerPactTest {
 
   static final GoldenInteraction DISCOVERY =
       GoldenInteraction.of(Trigger.event("StartupEvent"), STATE, "getOpenIdConfiguration")
-          .consumes("issuer", "jwks_uri", "token_endpoint");
+          .consumes("issuer", "jwks_uri", "token_endpoint")
+          .exact("issuer");
 
   static final GoldenInteraction JWKS =
       GoldenInteraction.of(Trigger.event("StartupEvent"), STATE, "getJwks")
@@ -98,30 +93,10 @@ class IdpConsumerPactTest {
         });
   }
 
-  /**
-   * The committed pact file: the library's rows, with the type matcher on {@code $.issuer}
-   * removed, so a provider that answers another issuer fails verification.
-   */
   @Test
-  void theCommittedPactIsWhatTheRowsWrite() throws Exception {
+  void theCommittedPactIsWhatTheRowsWrite() {
     PACT.assertEveryInteractionCarriesBothReferences();
-    StringWriter out = new StringWriter();
-    try (PrintWriter writer = new PrintWriter(out)) {
-      DefaultPactWriter.INSTANCE.writePact(PACT.pact(), writer, PactSpecVersion.V4);
-    }
-    JsonNode pact = MAPPER.readTree(out.toString());
-    boolean exact = false;
-    for (JsonNode interaction : pact.path("interactions")) {
-      if (interaction.path("description").asText().equals(DISCOVERY.description())
-          && interaction.path("response").path("matchingRules").path("body")
-              instanceof ObjectNode body) {
-        exact = body.remove("$.issuer") != null;
-      }
-    }
-    assertTrue(exact, "the discovery row carried a matcher on $.issuer to remove");
-    GoldenFiles.compareOrWrite(
-        ConsumerPact.pactsDirectory().resolve(PACT.file()),
-        ConsumerPact.normalise(MAPPER.writeValueAsString(pact)));
+    PACT.compareOrWritePactFile();
   }
 
   private static JsonNode get(String url) throws Exception {

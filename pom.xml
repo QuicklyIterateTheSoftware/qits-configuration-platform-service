@@ -97,7 +97,7 @@
         <!-- The one golden-master reader (qits-integrations-quarkus-javalib) and qits-idp's recorded
              answers it reads, both test scope, read by contracts/idp/IdpConsumerPactTest. Exact pins;
              they move like every internal pin: through a bump, never by hand. -->
-        <qits.pact-consumer.version>2026.1010.140259</qits.pact-consumer.version>
+        <qits.pact-consumer.version>2026.1010.141817</qits.pact-consumer.version>
         <qits.idp-golden-masters.version>2026.1010.134259</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
