@@ -118,4 +118,24 @@ class ConsumerPactVerificationTest {
   Map<String, String> anApplicationWithNoDeclaration() {
     return states.params(ProviderStates.AN_APPLICATION_WITH_NO_DECLARATION);
   }
+
+  @State(ProviderStates.AN_APPLICATION_WITH_STORED_ENTRIES_AND_NO_DECLARATION)
+  Map<String, String> anApplicationWithStoredEntriesAndNoDeclaration() {
+    return states.params(ProviderStates.AN_APPLICATION_WITH_STORED_ENTRIES_AND_NO_DECLARATION);
+  }
+
+  @State(ProviderStates.AN_APPLICATION_WITH_AN_ENTRY_IN_AN_ENVIRONMENT)
+  Map<String, String> anApplicationWithAnEntryInAnEnvironment() {
+    return states.params(ProviderStates.AN_APPLICATION_WITH_AN_ENTRY_IN_AN_ENVIRONMENT);
+  }
+
+  @State(ProviderStates.AN_APPLICATION_WITH_NO_CONFIGURATION)
+  Map<String, String> anApplicationWithNoConfiguration() {
+    return states.params(ProviderStates.AN_APPLICATION_WITH_NO_CONFIGURATION);
+  }
+
+  @State(ProviderStates.ENTRIES_OF_A_RETIRED_CONFIGURATION_KEY)
+  Map<String, String> entriesOfARetiredConfigurationKey() {
+    return states.params(ProviderStates.ENTRIES_OF_A_RETIRED_CONFIGURATION_KEY);
+  }
 }

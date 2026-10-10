@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "env": "test",
+      "application": "qits-agent-mcp",
+      "key": "env.EXAMPLE_TOKEN",
+      "value": "golden-token-value",
+      "entryClass": "plain",
+      "orphaned": false,
+      "revision": 1,
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "updatedBy": "golden-master"
+    }
+  ]
+}

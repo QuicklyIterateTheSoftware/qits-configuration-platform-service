@@ -28,11 +28,11 @@
           }
         },
         {
-          "operationId": "listPins",
+          "operationId": "listImagePins",
           "method": "GET",
           "path": "/configuration/api/pins",
           "status": 200,
-          "file": "a-declared-application-with-entries/listPins.json",
+          "file": "a-declared-application-with-entries/listImagePins.json",
           "frozen": {
             "ids": [],
             "instants": [
@@ -51,6 +51,62 @@
           },
           "status": 200,
           "file": "a-declared-application-with-entries/resolveConfiguration.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an application with an entry in an environment",
+      "slug": "an-application-with-an-entry-in-an-environment",
+      "params": {
+        "application": "qits-agent-mcp",
+        "env": "test",
+        "key": "env.EXAMPLE_TOKEN"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listEntries",
+          "method": "GET",
+          "path": "/configuration/api/applications/{application}/envs/{env}/entries",
+          "status": 200,
+          "file": "an-application-with-an-entry-in-an-environment/listEntries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.entries[*].updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an application with no configuration",
+      "slug": "an-application-with-no-configuration",
+      "params": {
+        "application": "golden-imported-app",
+        "env": "test"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "importProperties",
+          "method": "POST",
+          "path": "/configuration/api/import",
+          "query": {
+            "env": "test"
+          },
+          "contentType": "text/plain",
+          "body": "# golden-master import\nqits.platform.deployments.extras.golden-imported-app.env.QITS_GREETING=hello from the file\n",
+          "status": 200,
+          "file": "an-application-with-no-configuration/importProperties.json",
           "frozen": {
             "ids": [],
             "instants": [],
@@ -88,6 +144,69 @@
             ],
             "strings": [],
             "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an application with stored entries and no declaration",
+      "slug": "an-application-with-stored-entries-and-no-declaration",
+      "params": {
+        "application": "golden-entries-only-app",
+        "env": "test"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "resolveConfiguration",
+          "method": "GET",
+          "path": "/configuration/api/applications/{application}/envs/{env}/resolved",
+          "status": 200,
+          "file": "an-application-with-stored-entries-and-no-declaration/resolveConfiguration.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "entries of a retired configuration key",
+      "slug": "entries-of-a-retired-configuration-key",
+      "params": {
+        "application": "contract-app-00000001",
+        "env": "test",
+        "version": "2026.101.120000"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "collectEntries",
+          "method": "POST",
+          "path": "/configuration/api/gc/entries",
+          "contentType": "application/json",
+          "body": {
+            "dryRun": false,
+            "deployments": {
+              "pins": [
+                {
+                  "applicationName": "contract-app-00000001",
+                  "shas": [
+                    "2026.101.120000"
+                  ]
+                }
+              ]
+            }
+          },
+          "status": 200,
+          "file": "entries-of-a-retired-configuration-key/collectEntries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.removed"
           }
         }
       ]

@@ -1,0 +1,6 @@
+{
+  "headRevision": 1,
+  "properties": {
+    "qits.platform.deployments.extras.golden-entries-only-app.env.QITS_GREETING": "hello from the store"
+  }
+}

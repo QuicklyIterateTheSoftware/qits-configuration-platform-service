@@ -1,0 +1,22 @@
+{
+  "dryRun": false,
+  "examined": 1,
+  "removed": [
+    {
+      "application": "contract-app-00000001",
+      "env": "test",
+      "key": "env.QITS_RETIRED",
+      "reason": "retired",
+      "lastDeclaredBy": "2026.101.110000"
+    }
+  ],
+  "kept": {
+    "unpinned": 1,
+    "undeclaredPinnedVersion": 0,
+    "pinned": 1,
+    "inFlight": 0,
+    "neverDeclared": 0,
+    "staged": 0
+  },
+  "errors": []
+}

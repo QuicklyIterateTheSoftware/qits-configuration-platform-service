@@ -67,7 +67,7 @@ public class ImagePinsController {
    */
   @GET
   @Operation(
-      operationId = "listPins",
+      operationId = "listImagePins",
       summary = "The configured container-image versions, one row per pinned entry")
   @APIResponse(responseCode = "200", description = "The pins, possibly none")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})

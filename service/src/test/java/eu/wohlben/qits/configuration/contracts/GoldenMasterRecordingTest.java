@@ -117,52 +117,55 @@ class GoldenMasterRecordingTest {
       "/configuration/api/applications/{application}/declarations/{version}";
 
   /**
-   * The operations the expected consumers call (qits-1149): qits-projects-service reads entries,
-   * qits-deployments-service reads the resolved properties and declares its keys, and
-   * qits-orchestrator-service and qits-artifacts-service read the pins. The pins answer is the
-   * whole store's, so it keeps only the rows of the state's own application.
+   * The operations the expected consumers call (qits-1149): qits-projects-service reads the agent
+   * MCP entries, qits-deployments-service reads the resolved properties (with and without a
+   * version) and declares its keys, qits-orchestrator-service and qits-artifacts-service read the
+   * image pins, qits-orchestrator-service collects retired entries, and qits-bootstrap-cli imports
+   * a properties file. The pins and the collection answer for the whole store, so they keep only
+   * the rows of the state's own application, and the collection's whole-store counts are fixed.
    */
   static final List<Interaction> INTERACTIONS =
       List.of(
-          new Interaction(
+          read(
               ProviderStates.A_DECLARED_APPLICATION_WITH_ENTRIES,
               "listEntries",
-              "GET",
               ENTRIES,
               Map.of(),
               null,
-              null,
-              200,
-              null,
               "$.entries:key",
-              List.of(),
               List.of("$.entries[*].revision")),
-          new Interaction(
+          read(
               ProviderStates.A_DECLARED_APPLICATION_WITH_ENTRIES,
               "resolveConfiguration",
-              "GET",
               RESOLVED,
               Map.of("version", ProviderStates.VERSION),
               null,
               null,
-              200,
-              null,
-              null,
-              List.of(),
               List.of("$.headRevision")),
-          new Interaction(
+          read(
               ProviderStates.A_DECLARED_APPLICATION_WITH_ENTRIES,
-              "listPins",
-              "GET",
+              "listImagePins",
               "/configuration/api/pins",
+              Map.of(),
+              "$.pins",
+              null,
+              List.of()),
+          read(
+              ProviderStates.AN_APPLICATION_WITH_STORED_ENTRIES_AND_NO_DECLARATION,
+              "resolveConfiguration",
+              RESOLVED,
               Map.of(),
               null,
               null,
-              200,
-              "$.pins",
+              List.of("$.headRevision")),
+          read(
+              ProviderStates.AN_APPLICATION_WITH_AN_ENTRY_IN_AN_ENVIRONMENT,
+              "listEntries",
+              ENTRIES,
+              Map.of(),
               null,
-              List.of(),
-              List.of()),
+              "$.entries:key",
+              List.of("$.entries[*].revision")),
           new Interaction(
               ProviderStates.AN_APPLICATION_WITH_NO_DECLARATION,
               "declareKeys",
@@ -175,7 +178,57 @@ class GoldenMasterRecordingTest {
               null,
               null,
               List.of(),
-              List.of()));
+              List.of()),
+          new Interaction(
+              ProviderStates.AN_APPLICATION_WITH_NO_CONFIGURATION,
+              "importProperties",
+              "POST",
+              "/configuration/api/import",
+              Map.of("env", ProviderStates.ENV),
+              "text/plain",
+              ProviderStates.IMPORT,
+              200,
+              null,
+              null,
+              List.of(),
+              List.of()),
+          new Interaction(
+              ProviderStates.ENTRIES_OF_A_RETIRED_CONFIGURATION_KEY,
+              "collectEntries",
+              "POST",
+              "/configuration/api/gc/entries",
+              Map.of(),
+              "application/json",
+              ProviderStates.COLLECT_ENTRIES,
+              200,
+              "$.removed",
+              null,
+              List.of(),
+              List.of("$.examined", "$.kept.unpinned")));
+
+  /** A GET with no request body that answers 200. */
+  private static Interaction read(
+      String state,
+      String operationId,
+      String path,
+      Map<String, String> query,
+      String listFilteredTo,
+      String sortedBy,
+      List<String> fixedNumbers) {
+    return new Interaction(
+        state,
+        operationId,
+        "GET",
+        path,
+        query,
+        null,
+        null,
+        200,
+        listFilteredTo,
+        sortedBy,
+        List.of(),
+        fixedNumbers);
+  }
 
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final Pattern TEMPLATE_PARAM = Pattern.compile("\\{([^}]+)}");
@@ -193,7 +246,15 @@ class GoldenMasterRecordingTest {
     Map<String, ObjectNode> indexStates = new TreeMap<>();
     Map<String, Map<String, ObjectNode>> indexOperations = new TreeMap<>();
 
+    Set<String> takesBody = operationsTakingABody();
     for (Interaction interaction : INTERACTIONS) {
+      if ((interaction.body() != null) != takesBody.contains(interaction.operationId())) {
+        failures.add(
+            interaction.operationId()
+                + (interaction.body() != null
+                    ? " takes no request body, but the recording sends one: record null."
+                    : " takes a request body, but the recording sends none."));
+      }
       Recorded recorded = record(interaction);
       String slug = ProviderStates.slug(interaction.state());
       String file = slug + "/" + interaction.operationId() + ".json";
@@ -220,7 +281,13 @@ class GoldenMasterRecordingTest {
       }
       if (interaction.body() != null) {
         operation.put("contentType", interaction.contentType());
-        operation.put("body", interaction.body());
+        // A JSON body is recorded as JSON, as qits-projects-service records it; any other body as
+        // the text sent.
+        if (interaction.contentType().equals("application/json")) {
+          operation.set("body", JSON.readTree(interaction.body()));
+        } else {
+          operation.put("body", interaction.body());
+        }
       }
       operation.put("status", interaction.status());
       operation.put("file", file);
@@ -309,6 +376,9 @@ class GoldenMasterRecordingTest {
                               .encodeContentTypeAs(interaction.contentType(), ContentType.TEXT)))
               .contentType(interaction.contentType())
               .body(interaction.body());
+    } else {
+      // As a browser sends a body-less call: REST-assured would otherwise add a form content type.
+      request = request.noContentType();
     }
     Response response =
         request.when().request(interaction.method(), expand(interaction.path(), params));
@@ -409,7 +479,10 @@ class GoldenMasterRecordingTest {
     return (ArrayNode) node;
   }
 
-  /** Sets each {@code $.a} or {@code $.a[*].b} path to {@link #FIXED_NUMBER}. Package-private for the machinery test. */
+  /**
+   * Sets each {@code $.a}, {@code $.a.b} or {@code $.a[*].b} path to {@link #FIXED_NUMBER}.
+   * Package-private for the machinery test.
+   */
   static void fixNumbers(JsonNode body, List<String> paths) {
     for (String path : paths) {
       if (!path.startsWith("$.")) {
@@ -417,7 +490,14 @@ class GoldenMasterRecordingTest {
       }
       String[] parts = path.substring(2).split("\\[\\*]\\.", 2);
       if (parts.length == 1) {
-        setNumber(body, parts[0]);
+        int dot = parts[0].lastIndexOf('.');
+        JsonNode parent = body;
+        if (dot >= 0) {
+          for (String segment : parts[0].substring(0, dot).split("\\.")) {
+            parent = parent.path(segment);
+          }
+        }
+        setNumber(parent, parts[0].substring(dot + 1));
       } else {
         for (JsonNode element : body.path(parts[0])) {
           setNumber(element, parts[1]);
@@ -447,6 +527,30 @@ class GoldenMasterRecordingTest {
     }
     m.appendTail(out);
     return out.toString();
+  }
+
+  /** The operationIds whose operation declares a request body, read off the served openapi. */
+  private static Set<String> operationsTakingABody() throws IOException {
+    JsonNode paths =
+        JSON.readTree(
+                given()
+                    .when()
+                    .get("/configuration/q/openapi?format=json")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .asString())
+            .path("paths");
+    Set<String> ids = new TreeSet<>();
+    paths.forEach(
+        path ->
+            path.forEach(
+                operation -> {
+                  if (operation.has("operationId") && operation.has("requestBody")) {
+                    ids.add(operation.get("operationId").asText());
+                  }
+                }));
+    return ids;
   }
 
   private static ArrayNode strings(List<String> values) {
