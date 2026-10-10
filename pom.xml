@@ -89,6 +89,15 @@
              datasource, the durable-consumer tables and the catch-up sweeper; the payload is decoded
              into a local record (bus/SoftwareReleaseListener), so no qits-ci module is on the path. -->
         <qits.eventstream.version>2026.1003.44717</qits.eventstream.version>
+        <!-- pact-jvm (qits-1149), both halves on one version, the one every provider on the estate
+             verifies with: the consumer half writes pacts/qits-configuration-service_qits-events-service.json
+             (the eventstream catch-up's reads of qits-events), the provider half is
+             ConsumerPactVerificationTest. -->
+        <pact.version>4.6.21</pact.version>
+        <!-- qits-events' recorded answers (golden-masters/index.json + one JSON per state and
+             operation), test scope, read by contracts/events/EventsGoldenMasters. Moves like every
+             internal pin: through a bump, never by hand. -->
+        <qits.events-golden-masters.version>2026.1002.210125</qits.events-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -244,6 +253,24 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-eventstream</artifactId>
                 <version>${qits.eventstream.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site. -->
+                <groupId>au.com.dius.pact.consumer</groupId>
+                <artifactId>junit5</artifactId>
+                <version>${pact.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site. -->
+                <groupId>au.com.dius.pact.provider</groupId>
+                <artifactId>junit5</artifactId>
+                <version>${pact.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: recordings a test reads, never code. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-events-golden-masters</artifactId>
+                <version>${qits.events-golden-masters.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

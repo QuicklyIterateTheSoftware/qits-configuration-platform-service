@@ -147,6 +147,25 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- contracts/events: the consumer pact of the eventstream catch-up against qits-events.
+                 Plain JUnit 5 — EventsQuery talks over the JDK's HttpClient. -->
+            <groupId>au.com.dius.pact.consumer</groupId>
+            <artifactId>junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- contracts/ConsumerPactVerificationTest: verifies the consumer pacts this provider pins. -->
+            <groupId>au.com.dius.pact.provider</groupId>
+            <artifactId>junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- qits-events' recorded answers, pinned in the root pom. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-events-golden-masters</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- The store every @QuarkusTest here boots against, and the one PackagedSurfaceIT hands
                  to the launched process. testdb/EmbeddedPg + testdb/EmbeddedPgConfigSource hand the
                  running instance to Quarkus. -->
