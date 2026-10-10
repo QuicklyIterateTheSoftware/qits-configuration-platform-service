@@ -147,8 +147,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- contracts/events: the consumer pact of the eventstream catch-up against qits-events.
-                 Plain JUnit 5 — EventsQuery talks over the JDK's HttpClient. -->
+            <!-- contracts/idp: the consumer pact of quarkus-oidc's reads of qits-idp. Plain JUnit 5. -->
             <groupId>au.com.dius.pact.consumer</groupId>
             <artifactId>junit5</artifactId>
             <scope>test</scope>
@@ -160,9 +159,15 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- qits-events' recorded answers, pinned in the root pom. -->
+            <!-- The golden-master reader that turns qits-idp's recordings into pact rows. -->
             <groupId>${project.groupId}</groupId>
-            <artifactId>qits-events-golden-masters</artifactId>
+            <artifactId>qits-pact-consumer</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- qits-idp's recorded answers, pinned in the root pom. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-idp-golden-masters</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

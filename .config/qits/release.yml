@@ -4,15 +4,15 @@ artifacts:
 # THE CONTRACTS (qits-1149). The provider golden masters: the platform packages `golden-masters/`
 # as `eu.wohlben.qits:qits-configuration-golden-masters` and `@qits/configuration-golden-masters`,
 # each published only when its content changed; `contracts/GoldenMasterRecordingTest` records them.
-# The pacts: this repository's consumer pact against qits-events (the eventstream catch-up's reads),
-# flat in `pacts/` as `qits-configuration-service_qits-events-service.json`; qits-ci packs it into
-# eu.wohlben.qits:qits-configuration-service-pacts-qits-events-service and publishes it only when
-# it changed.
+# The pacts: this repository's consumer pact against qits-idp (quarkus-oidc's discovery and JWKS
+# reads), flat in `pacts/` as `qits-configuration-service_qits-idp-service.json`; qits-ci packs it
+# into eu.wohlben.qits:qits-configuration-service-pacts-qits-idp-service and publishes it only when
+# it changed. The eventstream catch-up's reads of qits-events are pacted by qits-eventstream-javalib.
 contracts:
   application: qits-configuration
   golden-masters: { from: golden-masters/, packages: [maven, npm] }
   pacts:
-    qits-events-service: { packages: [maven] }
+    qits-idp-service: { packages: [maven] }
 userflows: qits-configuration
 
 # TWO FLAGS OUTSIDE THE RECIPE'S ALLOW-LIST: `-Dtest=SKIPNONE -Dsurefire.failIfNoSpecifiedTests=false`,
