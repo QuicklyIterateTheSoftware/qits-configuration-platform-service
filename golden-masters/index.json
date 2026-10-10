@@ -1,0 +1,96 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-configuration",
+  "states": [
+    {
+      "name": "a declared application with entries",
+      "slug": "a-declared-application-with-entries",
+      "params": {
+        "application": "golden-declared-app",
+        "env": "test",
+        "version": "2026.1010.1"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listEntries",
+          "method": "GET",
+          "path": "/configuration/api/applications/{application}/envs/{env}/entries",
+          "status": 200,
+          "file": "a-declared-application-with-entries/listEntries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.entries[*].updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listPins",
+          "method": "GET",
+          "path": "/configuration/api/pins",
+          "status": 200,
+          "file": "a-declared-application-with-entries/listPins.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.generatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.pins"
+          }
+        },
+        {
+          "operationId": "resolveConfiguration",
+          "method": "GET",
+          "path": "/configuration/api/applications/{application}/envs/{env}/resolved",
+          "query": {
+            "version": "2026.1010.1"
+          },
+          "status": 200,
+          "file": "a-declared-application-with-entries/resolveConfiguration.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an application with no declaration",
+      "slug": "an-application-with-no-declaration",
+      "params": {
+        "application": "golden-undeclared-app",
+        "env": "test",
+        "version": "2026.1010.1"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "declareKeys",
+          "method": "POST",
+          "path": "/configuration/api/applications/{application}/declarations/{version}",
+          "query": {
+            "deploymentTarget": "environment"
+          },
+          "contentType": "application/yaml",
+          "body": "keys:\n  env.QITS_GREETING:\n    type: string\n    default: hello\n  env.QITS_PEER_URL:\n    type: serviceAddress\n    service: golden-peer\n    port: 8080\n  env.QITS_IMAGE_VERSION:\n    type: packageVersion\n    package:\n      type: docker\n      name: qits/golden-image\n",
+          "status": 201,
+          "file": "an-application-with-no-declaration/declareKeys.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.declaration.receivedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

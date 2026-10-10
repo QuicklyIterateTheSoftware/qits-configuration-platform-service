@@ -88,7 +88,9 @@ public class DeclarationsController {
   @POST
   @Path("/{version}")
   @Consumes({APPLICATION_YAML, MediaType.TEXT_PLAIN})
-  @Operation(summary = "Record one version's declaration of its configuration keys")
+  @Operation(
+      operationId = "declareKeys",
+      summary = "Record one version's declaration of its configuration keys")
   @APIResponse(responseCode = "200", description = "This exact document was already recorded")
   @APIResponse(responseCode = "201", description = "Recorded")
   @APIResponse(
@@ -130,7 +132,9 @@ public class DeclarationsController {
    */
   @DELETE
   @Path("/{version}")
-  @Operation(summary = "Remove one version's declaration, keeping the record of it")
+  @Operation(
+      operationId = "removeDeclaration",
+      summary = "Remove one version's declaration, keeping the record of it")
   @APIResponse(responseCode = "204", description = "Removed")
   @APIResponse(responseCode = "400", description = "The application or version is not valid")
   @APIResponse(responseCode = "401", description = "Gate on and no machine token presented")
@@ -152,7 +156,9 @@ public class DeclarationsController {
    * pair of roles and calls no machine guard.
    */
   @GET
-  @Operation(summary = "Every declaration of one application, newest first")
+  @Operation(
+      operationId = "listDeclarations",
+      summary = "Every declaration of one application, newest first")
   @APIResponse(responseCode = "200", description = "The declarations")
   @APIResponse(responseCode = "400", description = "The application name is not valid")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
@@ -163,7 +169,9 @@ public class DeclarationsController {
   /** One declaration in full: the keys this service parsed out of it, and the document itself. */
   @GET
   @Path("/{version}")
-  @Operation(summary = "One declaration: its parsed keys and the document it came from")
+  @Operation(
+      operationId = "getDeclaration",
+      summary = "One declaration: its parsed keys and the document it came from")
   @APIResponse(responseCode = "200", description = "The declaration")
   @APIResponse(responseCode = "400", description = "The application or version is not valid")
   @APIResponse(responseCode = "404", description = "No such declaration")

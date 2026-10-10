@@ -1,0 +1,41 @@
+{
+  "declaration": {
+    "application": "golden-undeclared-app",
+    "version": "2026.1010.1",
+    "deploymentTarget": "environment",
+    "contentHash": "da66ab29c76e84705bb264fa629329d5396066ae3f72ea7726d1c0b4a55eb67d",
+    "governing": true,
+    "receivedAt": "2026-01-01T00:00:00Z",
+    "receivedBy": "dev",
+    "keys": [
+      {
+        "key": "env.QITS_GREETING",
+        "type": "string",
+        "defaultValue": "hello",
+        "service": null,
+        "port": null,
+        "packageType": null,
+        "packageName": null
+      },
+      {
+        "key": "env.QITS_IMAGE_VERSION",
+        "type": "packageVersion",
+        "defaultValue": null,
+        "service": null,
+        "port": null,
+        "packageType": "docker",
+        "packageName": "qits/golden-image"
+      },
+      {
+        "key": "env.QITS_PEER_URL",
+        "type": "serviceAddress",
+        "defaultValue": null,
+        "service": "golden-peer",
+        "port": 8080,
+        "packageType": null,
+        "packageName": null
+      }
+    ],
+    "raw": "keys:\n  env.QITS_GREETING:\n    type: string\n    default: hello\n  env.QITS_PEER_URL:\n    type: serviceAddress\n    service: golden-peer\n    port: 8080\n  env.QITS_IMAGE_VERSION:\n    type: packageVersion\n    package:\n      type: docker\n      name: qits/golden-image\n"
+  }
+}

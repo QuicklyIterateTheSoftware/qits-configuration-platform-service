@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "env": "test",
+      "application": "golden-declared-app",
+      "key": "env.QITS_GREETING",
+      "value": "hello from the store",
+      "entryClass": "plain",
+      "orphaned": false,
+      "revision": 1,
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "updatedBy": "golden-master"
+    },
+    {
+      "env": "test",
+      "application": "golden-declared-app",
+      "key": "env.QITS_IMAGE_VERSION",
+      "value": "2026.1010.120000",
+      "entryClass": "plain",
+      "orphaned": false,
+      "revision": 1,
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "updatedBy": "golden-master"
+    }
+  ]
+}

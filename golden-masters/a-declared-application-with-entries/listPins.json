@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "pins": [
+    {
+      "image": "qits/golden-image",
+      "version": "2026.1010.120000",
+      "application": "golden-declared-app",
+      "key": "env.QITS_IMAGE_VERSION"
+    }
+  ]
+}

@@ -83,7 +83,9 @@ public class ConfigurationController {
    * to be able to answer.
    */
   @GET
-  @Operation(summary = "Every configured application, with per-environment counts and revisions")
+  @Operation(
+      operationId = "listApplications",
+      summary = "Every configured application, with per-environment counts and revisions")
   @APIResponse(responseCode = "200", description = "The applications")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
   public ListApplicationsResponse applications() {
@@ -126,7 +128,9 @@ public class ConfigurationController {
    */
   @GET
   @Path("/{application}/envs/{env}/resolved")
-  @Operation(summary = "One application's configuration in one environment, fully prefixed")
+  @Operation(
+      operationId = "resolveConfiguration",
+      summary = "One application's configuration in one environment, fully prefixed")
   @APIResponse(responseCode = "200", description = "The resolved properties and the head revision")
   @APIResponse(responseCode = "400", description = "The environment or application name is invalid")
   @APIResponse(responseCode = "404", description = "The named declaration version does not exist")
@@ -155,7 +159,9 @@ public class ConfigurationController {
    */
   @GET
   @Path("/{application}/envs/{env}/entries")
-  @Operation(summary = "One application's current entries in one environment")
+  @Operation(
+      operationId = "listEntries",
+      summary = "One application's current entries in one environment")
   @APIResponse(responseCode = "200", description = "The entries")
   @APIResponse(responseCode = "400", description = "The environment or application name is invalid")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
@@ -178,7 +184,7 @@ public class ConfigurationController {
    */
   @PUT
   @Path("/{application}/envs/{env}/entries/{key}")
-  @Operation(summary = "Set one entry's value in one environment")
+  @Operation(operationId = "setEntry", summary = "Set one entry's value in one environment")
   @APIResponse(responseCode = "200", description = "The entry, already present")
   @APIResponse(responseCode = "201", description = "The entry, newly created")
   @APIResponse(responseCode = "400", description = "The env, application, key or value is invalid")
@@ -200,7 +206,9 @@ public class ConfigurationController {
    */
   @DELETE
   @Path("/{application}/envs/{env}/entries/{key}")
-  @Operation(summary = "Remove one entry from one environment, keeping it in the history")
+  @Operation(
+      operationId = "removeEntry",
+      summary = "Remove one entry from one environment, keeping it in the history")
   @APIResponse(responseCode = "204", description = "Removed")
   @APIResponse(responseCode = "400", description = "The env, application or key is not valid")
   @APIResponse(responseCode = "404", description = "No such entry in that environment")
@@ -222,7 +230,9 @@ public class ConfigurationController {
    */
   @GET
   @Path("/{application}/envs/{env}/history")
-  @Operation(summary = "One application's write history in one environment, newest first")
+  @Operation(
+      operationId = "listHistory",
+      summary = "One application's write history in one environment, newest first")
   @APIResponse(responseCode = "200", description = "The revisions")
   @APIResponse(responseCode = "400", description = "The environment or application name is invalid")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})

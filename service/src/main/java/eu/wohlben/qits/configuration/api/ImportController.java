@@ -62,7 +62,9 @@ public class ImportController {
    */
   @POST
   @Consumes(MediaType.TEXT_PLAIN)
-  @Operation(summary = "Import an extras properties file into one environment, idempotently")
+  @Operation(
+      operationId = "importProperties",
+      summary = "Import an extras properties file into one environment, idempotently")
   @APIResponse(responseCode = "200", description = "What the import did")
   @APIResponse(
       responseCode = "400",

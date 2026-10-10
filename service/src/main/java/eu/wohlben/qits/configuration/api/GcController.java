@@ -63,7 +63,9 @@ public class GcController {
    */
   @POST
   @Path("/entries")
-  @Operation(summary = "Collect the entries of retired keys that no pinned version declares")
+  @Operation(
+      operationId = "collectEntries",
+      summary = "Collect the entries of retired keys that no pinned version declares")
   @APIResponse(responseCode = "200", description = "What was judged, removed, kept and failed")
   @APIResponse(responseCode = "400", description = "The deployments pins are missing or malformed")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system"})

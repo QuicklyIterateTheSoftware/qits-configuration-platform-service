@@ -1,0 +1,8 @@
+{
+  "headRevision": 1,
+  "properties": {
+    "qits.platform.deployments.extras.golden-declared-app.env.QITS_GREETING": "hello from the store",
+    "qits.platform.deployments.extras.golden-declared-app.env.QITS_PEER_URL": "http://test-golden-peer:8080",
+    "qits.platform.deployments.extras.golden-declared-app.env.QITS_IMAGE_VERSION": "2026.1010.120000"
+  }
+}
