@@ -97,7 +97,7 @@
         <!-- qits-events' recorded answers (golden-masters/index.json + one JSON per state and
              operation), test scope, read by contracts/events/EventsGoldenMasters. Moves like every
              internal pin: through a bump, never by hand. -->
-        <qits.events-golden-masters.version>2026.1002.210125</qits.events-golden-masters.version>
+        <qits.events-golden-masters.version>2026.1010.121628</qits.events-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
