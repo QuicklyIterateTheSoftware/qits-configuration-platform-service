@@ -3,7 +3,6 @@ package eu.wohlben.qits.configuration.control;
 import eu.wohlben.qits.configuration.dto.ApplicationEnvSummaryDto;
 import eu.wohlben.qits.configuration.dto.ApplicationSummaryDto;
 import eu.wohlben.qits.configuration.dto.ConfigurationEntryDto;
-import eu.wohlben.qits.configuration.dto.ImagePinDto;
 import eu.wohlben.qits.configuration.dto.ImportSummaryDto;
 import eu.wohlben.qits.configuration.dto.ResolvedConfigurationDto;
 import eu.wohlben.qits.configuration.entity.ConfigurationDeclaration;
@@ -378,66 +377,6 @@ public class ConfigurationService {
           Set<String> envs = new TreeSet<>(entries.listDistinctEnvs());
           return List.copyOf(envs);
         });
-  }
-
-  /**
-   * THE PIN REPORT: every pinned (application, key) that currently has a stored version, in the
-   * answer's fixed order.
-   *
-   * <p><b>It is a projection over two sources now</b>, put together by {@link ImagePins#merge}: the
-   * {@code docker} {@code packageVersion} keys of every governing declaration, and the {@link
-   * ImagePins#ORDERED} rows no declaration has claimed. One merge function, shared with {@code
-   * bus/SoftwareReleaseListener}, because a report that disagreed with the writer about which of the
-   * two won would be fiction in exactly the way this whole arrangement exists to prevent.
-   *
-   * <p><b>Declared coordinates of another type are not here.</b> The consumer is qits-artifacts'
-   * IMAGE collector and the wire field is called {@code image}; a {@code binary} coordinate in this
-   * answer would be a row it cannot act on, under a name it would try to parse as a tag.
-   *
-   * <p><b>It reads EVERY env, and {@code /pins} is env-less because its caller is.</b> qits-artifacts
-   * asks "which image tags may I delete" about a registry the whole platform shares, so the answer
-   * has no tier in it — but the question is answered by the UNION rather than by one env, which is
-   * the only reading that is safe in the direction this answer is used. It used to read one
-   * configured env, and what that cost was a version released into another tier and never into this
-   * one: a tag still in use by a running container, missing from the keep-list. Two tiers on
-   * different versions of one image now contribute a row each, and the collector keeps both, which
-   * is what it should do with an image two containers are running.
-   *
-   * <p><b>An entry with nothing stored is omitted rather than answered blank.</b> No entry means the
-   * image has never been released into this environment, so there is no version, and a row carrying
-   * an empty one would name a tag that cannot exist. Every mapping missing is an empty list, which
-   * is a complete answer and not an error — a platform that has released nothing pins nothing.
-   *
-   * <p>It reads the head rows one mapping at a time, which is a point-read on a unique key per
-   * pinned pair. A listing filtered in memory would be shorter to write and would quietly grow with
-   * the table instead of with the pins.
-   *
-   * <p>Not wrapped in a retry, like every read this service SERVES: the caller — qits-artifacts'
-   * collector, deciding what it may delete — has its own posture about an unreachable configuration
-   * service, and it is a fail-closed one. Patience here would only make its deadline arrive with
-   * less information. The two bracketed reads above are not exceptions to that rule; they are the
-   * bus consumer's, and their bracket is about a transaction rather than about patience.
-   */
-  public List<ImagePinDto> imagePins() {
-    List<ImagePins.Pin> merged =
-        ImagePins.merge(
-            governingPins(declaredKeys.listByPackageType(ImagePins.DOCKER_TYPE)),
-            ImagePins.ORDERED);
-    List<ImagePinDto> pins = new ArrayList<>(merged.size());
-    for (ImagePins.Pin pin : merged) {
-      // One row per DISTINCT version, not per env: the wire shape has no env field and two tiers
-      // holding the same version are one fact about the registry, not two.
-      Set<String> versions = new LinkedHashSet<>();
-      for (ConfigurationEntry entry : entries.listByKey(pin.application(), pin.key())) {
-        if (entry.entryValue != null && !entry.entryValue.isBlank()) {
-          versions.add(entry.entryValue);
-        }
-      }
-      for (String version : versions) {
-        pins.add(new ImagePinDto(pin.image(), version, pin.application(), pin.key()));
-      }
-    }
-    return pins;
   }
 
   /** One application's history in one env, newest first. */

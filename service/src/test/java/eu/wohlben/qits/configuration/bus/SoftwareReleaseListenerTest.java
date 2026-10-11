@@ -25,8 +25,8 @@ import org.junit.jupiter.api.Test;
  * does not need.
  *
  * <p><b>The merge is NOT stubbed.</b> {@link ImagePins#merge} is the real one, so the shadowing rule
- * these tests assert is the same code {@code ConfigurationService.imagePins} reports through. A
- * stand-in that decided which half won would be testing the test.
+ * these tests assert is the code the listener runs. A stand-in that decided which half won would be
+ * testing the test.
  *
  * <p><b>Every write's env is asserted</b>, because the fan-out is the half of this listener that
  * changed: a pin is an entry, an entry is a per-env override with no default row under it, and an

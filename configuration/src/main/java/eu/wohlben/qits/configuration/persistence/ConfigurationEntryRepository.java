@@ -36,17 +36,6 @@ public class ConfigurationEntryRepository
     return list("env = ?1 and application = ?2 order by entryKey", env, application);
   }
 
-  /**
-   * One (application, key) in EVERY env that currently holds it, env-ordered.
-   *
-   * <p>The pin report's read. It asks about a registry the whole platform shares, so the answer it
-   * needs is the union across tiers rather than one env's value — a version running in one tier and
-   * not in another is still a tag that may not be collected.
-   */
-  public List<ConfigurationEntry> listByKey(String application, String key) {
-    return list("application = ?1 and entryKey = ?2 order by env", application, key);
-  }
-
   /** Every current entry, env first, then application. */
   public List<ConfigurationEntry> listEverything() {
     return listAll(Sort.by("env").and("application").and("entryKey"));

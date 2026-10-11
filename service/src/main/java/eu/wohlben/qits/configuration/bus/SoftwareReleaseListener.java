@@ -27,9 +27,7 @@ import org.jboss.logging.Logger;
  * every write this listener makes today comes from a declaration. It is still asked, and must be:
  * the list is a residual rather than a retired mechanism, and the next consumer that cannot declare
  * lands in it. {@link ImagePins#merge} puts the
- * two together with declarations winning per (application, key), and {@code
- * ConfigurationService.imagePins} reports through the same function — so the pin mechanism and the
- * pin report cannot disagree about which half won.
+ * two together with declarations winning per (application, key).
  *
  * <p><b>A declared coordinate is matched on both strings and is NOT gated on docker.</b> The
  * declaration names its own package type, so {@code binary} matches exactly as {@code docker} does.

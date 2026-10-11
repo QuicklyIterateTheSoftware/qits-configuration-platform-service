@@ -92,11 +92,6 @@ class AgentReadAccessTest {
   }
 
   @Test
-  void anAgentReadsTheImagePins() {
-    asAgent().when().get(BASE + "/pins").then().statusCode(200);
-  }
-
-  @Test
   void anAgentCannotWrite() {
     asAgent()
         .contentType(ContentType.JSON)

@@ -31,9 +31,9 @@ import java.util.Map;
  * one place a pin the declaring side cannot express is written down, and the next consumer that
  * arrives before it can declare — a new image started per unit of work, on an application whose
  * {@code .config/qits/configuration.yml} does not carry the key — lands here and works with no other
- * edit. {@link #merge} is still where the declared half and this one meet, {@link #ORDERED} is still
- * what the report walks, and {@link #BY_IMAGE} is still what the listener matches against. Deleting
- * the class because its list is empty would take all three with it.
+ * edit. {@link #merge} is still where the declared half and this one meet, and {@link #BY_IMAGE} is
+ * still what the listener matches against. Deleting the class because its list is empty would take
+ * both with it.
  *
  * <p><b>One image may still land on several applications</b>, and the list allows it: a pin is keyed
  * by the released image and nothing about the write assumes one entry per application, so a second
@@ -48,25 +48,18 @@ import java.util.Map;
  * property writes an entry the consumer never reads — and says nothing about it at any log level.
  * That is not a historical remark: it is the rule the next row typed below has to satisfy.
  *
- * <h2>Why it is here rather than beside the listener that writes it</h2>
+ * <p>{@code bus/SoftwareReleaseListener} matches a {@code SoftwareRelease} against {@link #BY_IMAGE}
+ * and WRITES the version. Adding a pin is one more {@link Pin} in {@link #AUTHORED}, and nothing
+ * else changes.
  *
- * <p>Two paths read this list and they must never disagree. {@code bus/SoftwareReleaseListener}
- * matches a {@code SoftwareRelease} against {@link #BY_IMAGE} and WRITES the version; {@code
- * api/ImagePinsController} walks {@link #ORDERED}, resolves each mapping against the current entries
- * and REPORTS what is pinned. A private copy in either of them would be a second opinion about what
- * this platform launches — the pin mechanism and the pin report have to be the same list or the
- * report is fiction. Adding a pin is one more {@link Pin} in {@link #AUTHORED}; both views derive
- * from it, and nothing else changes.
- *
- * <h2>AND BOTH PATHS NOW ASK THE APPLICATIONS FIRST</h2>
+ * <h2>THE LISTENER ASKS THE APPLICATIONS FIRST</h2>
  *
  * <p><b>This list is no longer the whole answer, and the direction of travel is out of it.</b> An
  * application that declares {@code packageVersion} keys in its own
  * {@code .config/qits/configuration.yml} says which package each key carries a version of, and that
  * declaration is a fact about the build rather than a mapping somebody remembered to add here. So
- * the listener matches a release against the DECLARED coordinates and this list, and the report is
- * the union of both — {@link #merge} is the one place the two are put together, so the write and the
- * report cannot disagree about which of them won.
+ * the listener matches a release against the DECLARED coordinates and this list — {@link #merge} is
+ * the one place the two are put together.
  *
  * <p><b>{@link #AUTHORED} is therefore the residual: what is still true because nobody has declared
  * it.</b> A consumer that adopts declarations takes its own rows out of here in the same wave —
@@ -74,19 +67,6 @@ import java.util.Map;
  * authored row for the same (application, key) while it is still typed below. Do not add a pin here
  * that could be declared; the entry left in this list is the one whose application cannot say it
  * yet.
- *
- * <h2>What the report is for: qits-artifacts' garbage collection</h2>
- *
- * <p>qits-artifacts reads {@code GET /configuration/api/pins} as a <b>pin source</b> when it decides
- * which container images it may delete. A configured image version is one a container launch will
- * pull <i>cold</i> — the deployer expands the entry, the host has never seen the tag, and no access
- * timestamp on the registry says so, because nothing has accessed it yet. Age and last-access are
- * exactly the wrong evidence for this class of image, so the answer here is the evidence instead.
- *
- * <p>The other direction is just as load-bearing: an image OUTSIDE this list is not
- * launchable-by-configuration at all, so it needs no row and gets none. That is what keeps the answer
- * a short, checkable statement about what the platform starts rather than a listing of everything it
- * has ever built.
  */
 public final class ImagePins {
 
@@ -97,9 +77,7 @@ public final class ImagePins {
    * <p>{@code image} is the released package's NAME, which for every pin authored below is a docker
    * image and is spelled exactly as qits-ci publishes it. A pin derived from a declaration carries
    * the declared {@code package.name} in the same component, so a declared docker coordinate and an
-   * authored one are the same shape and {@link #merge} can put them side by side. The component
-   * keeps its name because the report's wire field is {@code image} and the collector that reads it
-   * parses that word.
+   * authored one are the same shape and {@link #merge} can put them side by side.
    */
   public record Pin(String image, String application, String key) {}
 
@@ -107,18 +85,15 @@ public final class ImagePins {
    * The {@code packageType} of every pin written down here, as the wire and the declaration grammar
    * both spell it.
    *
-   * <p>It is a constant rather than a literal in two files because two readers need it: the listener
-   * gates {@link #BY_IMAGE} on it (an authored pin is an IMAGE pin, so a maven artifact of the same
-   * name must not move one) and the pin report selects the declared keys it can answer for. A
-   * declared coordinate of any other type — {@code binary} today — is matched by the declaration and
+   * <p>The listener gates {@link #BY_IMAGE} on it: an authored pin is an IMAGE pin, so a maven
+   * artifact of the same name must not move one. A declared coordinate of any other type — {@code binary} today — is matched by the declaration and
    * is outside this list by construction.
    */
   public static final String DOCKER_TYPE = "docker";
 
   /**
    * THE ANSWER'S ORDER — image, then application, then key — and every list of pins this class hands
-   * out is in it, whether it came from here or from a declaration. One comparator, because the sort
-   * is the contract {@code /pins} is diffed under and two spellings of it would be two contracts.
+   * out is in it, whether it came from here or from a declaration.
    */
   private static final Comparator<Pin> ORDER =
       Comparator.comparing(Pin::image).thenComparing(Pin::application).thenComparing(Pin::key);
@@ -164,8 +139,8 @@ public final class ImagePins {
   // — not a row on a different application, not a row under a different key.
   //
   // THIS IS NOT A DECLARATION AND `merge` DOES NOT COVER IT. A declared pin shadows an authored row
-  // for the same (application, key) — that is the ordinary way a row leaves, and the report keeps
-  // answering for the pair under the name the application itself gave it. These four leave with no
+  // for the same (application, key) — that is the ordinary way a row leaves, and the listener keeps
+  // writing the pair under the name the application itself gave it. These four leave with no
   // successor at all, because the fact moved out of configuration entirely and there is no pair
   // left to answer for, so removing them here is the whole of it on this side. The entries they
   // already wrote are not deleted by this (nothing here deletes an entry, by design): each consumer
@@ -174,16 +149,13 @@ public final class ImagePins {
   // as the old entry is still in the store. THAT RENAME IS THE WHOLE OF WHAT STOPS THE RESIDUE
   // DECIDING. Removing a row here stops future WRITES and nothing else.
   //
-  // DO NOT ADD ANY OF THEM BACK to "keep the pin report complete". The report is about what is
-  // launchable-by-configuration, and none of these images is, any more. A row put back would start
-  // rewriting an entry nobody reads, and qits-artifacts would be told to protect a tag on the
-  // strength of it.
+  // DO NOT ADD ANY OF THEM BACK. None of these images is launchable-by-configuration any more, so a
+  // row put back would start rewriting an entry nobody reads.
 
   /**
    * Every pin in the answer's order — image, then application, then key — sorted here rather than
-   * trusted to how {@link #AUTHORED} happens to be typed. The report is read by a machine that
-   * compares one run's answer with the last one's, so the order is part of the contract and must not
-   * be a property of an editor's cursor.
+   * trusted to how {@link #AUTHORED} happens to be typed, so the order is never a property of an
+   * editor's cursor.
    */
   public static final List<Pin> ORDERED = AUTHORED.stream().sorted(ORDER).toList();
 
@@ -219,16 +191,14 @@ public final class ImagePins {
    * application's configuration — so an authored row naming the same pair is the same pin described
    * twice, and the description the application itself shipped is the one to keep. It matters most
    * when the two disagree about the IMAGE: an application that has renamed the image it starts says
-   * so in its declaration, and a report that answered with both names would have qits-artifacts
-   * protecting a tag nobody launches while the one it does launch ages out.
+   * so in its declaration, and a release of the old name must not write the key the new one owns.
    *
    * <p>Shadowing is per pair rather than per application, because an application may declare one of
    * its keys and still be carried by hand on another — that is the ordinary state of a half-adopted
    * consumer, and it must not lose the pin it has not declared yet.
    *
-   * <p>The answer is sorted (image, application, key) rather than left in either input's order. The
-   * report is read by a machine that diffs one run's answer against the last one's, so the order is
-   * part of the contract and must not be a property of which half a row came out of.
+   * <p>The answer is sorted (image, application, key) rather than left in either input's order, so
+   * the order is never a property of which half a row came out of.
    */
   public static List<Pin> merge(List<Pin> declared, List<Pin> authored) {
     Map<String, Pin> byPair = new LinkedHashMap<>();

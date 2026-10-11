@@ -119,10 +119,9 @@ class GoldenMasterRecordingTest {
   /**
    * The operations the expected consumers call (qits-1149): qits-projects-service reads the agent
    * MCP entries, qits-deployments-service reads the resolved properties (with and without a
-   * version) and declares its keys, qits-orchestrator-service and qits-artifacts-service read the
-   * image pins, qits-orchestrator-service collects retired entries, and qits-bootstrap-cli imports
-   * a properties file. The pins and the collection answer for the whole store, so they keep only
-   * the rows of the state's own application, and the collection's whole-store counts are fixed.
+   * version) and declares its keys, qits-orchestrator-service collects retired entries, and
+   * qits-bootstrap-cli imports a properties file. The collection answers for the whole store, so it
+   * keeps only the rows of the state's own application, and its whole-store counts are fixed.
    */
   static final List<Interaction> INTERACTIONS =
       List.of(
@@ -142,14 +141,6 @@ class GoldenMasterRecordingTest {
               null,
               null,
               List.of("$.headRevision")),
-          read(
-              ProviderStates.A_DECLARED_APPLICATION_WITH_ENTRIES,
-              "listImagePins",
-              "/configuration/api/pins",
-              Map.of(),
-              "$.pins",
-              null,
-              List.of()),
           read(
               ProviderStates.AN_APPLICATION_WITH_STORED_ENTRIES_AND_NO_DECLARATION,
               "resolveConfiguration",

@@ -28,21 +28,6 @@
           }
         },
         {
-          "operationId": "listImagePins",
-          "method": "GET",
-          "path": "/configuration/api/pins",
-          "status": 200,
-          "file": "a-declared-application-with-entries/listImagePins.json",
-          "frozen": {
-            "ids": [],
-            "instants": [
-              "$.generatedAt"
-            ],
-            "strings": [],
-            "listFilteredTo": "$.pins"
-          }
-        },
-        {
           "operationId": "resolveConfiguration",
           "method": "GET",
           "path": "/configuration/api/applications/{application}/envs/{env}/resolved",

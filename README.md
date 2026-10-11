@@ -123,7 +123,6 @@ no anonymous route.
 | `DELETE /applications/{app}/envs/{env}/entries/{key}` | remove one entry, keeping it in the history |
 | `GET /applications/{app}/envs/{env}/history` | every revision of that env, newest first |
 | `POST /import?env=` | `text/plain`, an extras properties file whole, into the env the caller names. Idempotent; answers `{imported, unchanged, kept, ignored}` |
-| `GET /pins` | the configured container-image versions — `{generatedAt, pins:[{image, version, application, key}]}` |
 | `POST /gc/entries` | **the entry collector**, `{dryRun, deployments}` with `deployments` the body of qits-deployments' `GET /deployments/api/pins`, verbatim. Answers `{dryRun, examined, removed:[{application, env, key, reason, lastDeclaredBy}], kept:{…per reason}, errors}`; missing pins are a 400 that deletes nothing. `qits:admin` or `qits:system` |
 | `POST /applications/{app}/declarations/{version}?deploymentTarget=` | `application/yaml`, the document raw. **`qits:system` + `MachineAuth`.** 201 new, 200 identical, 409 different-under-a-taken-version, 422 unreadable |
 | `DELETE /applications/{app}/declarations/{version}` | the tag-recovery door. **`qits:system` + `MachineAuth`.** 204; the previous version governs again |
@@ -149,38 +148,21 @@ namespace to be written down. That namespace has moved twice already. **They car
 not: the map is layered into one container's configuration, and that container is in exactly one
 environment — the one named in the path of the read.
 
-### The pin report
+### Release pins
 
-`GET /pins` answers one row per image→(application, key)→version that is currently stored, ordered by
-image, then application, then key. An image appears twice when two applications start it — the shape
-allows it, though no mapping uses it today; `qits/workspace` was the example until the last
-application reading it from configuration moved the version into its own pom — or when two envs hold
-different versions of it. Every mapping the report answers for is now a **declared** one:
-`control/ImagePins` has carried no row since 2026-09-17. A mapping with nothing stored anywhere is
-**omitted**, because an image nobody has released here has no version to name. An empty `pins` is an
-ordinary 200.
+A pin says: when this package is released, its version becomes the value of this key on this
+application. **The mappings come from two places and declarations win.** A `packageVersion` key in
+an application's own declaration says which package that key carries a version of;
+`control/ImagePins` is the residual list of image pins still carried by hand, empty since 2026-09-17,
+and a row of it is dropped when a declaration names the same (application, key).
 
-**The mappings come from two places and declarations win.** A `packageVersion` key in an
-application's own declaration says which package that key carries a version of, and every governing
-one of `type: docker` is a mapping; `control/ImagePins` is the residual list of pins still carried by
-hand for consumers that have not declared yet, and a row of it is dropped when a declaration names
-the same (application, key). A `binary` coordinate is a real declaration and stays out of this
-answer, which is about container images. **The route is env-less because its caller is, and it reads
-the UNION over every env**: qits-artifacts asks about a registry the whole platform shares, so the
-answer has no tier in it — but two tiers on two versions of one image are two tags in use, and both
-are reported. Two tiers on the same version are one row, since the shape carries no env.
+`bus/SoftwareReleaseListener` matches an announced release against both sources through one merge
+function, and writes the version into **every env this store knows about** — an entry is a per-env
+override with no default row beneath it, so an env a release does not reach starts its containers on
+the image's committed default.
 
-It is a projection of entries a caller could read one at a time; what it adds is **the mapping**,
-which lives in this service and nowhere else. **qits-artifacts' garbage collector reads it as a pin
-source**: a configured version is one a container launch will pull *cold*, so the registry's own
-last-accessed record says nothing about it and deleting it is a workspace that will not start. An
-image nothing maps to is not launchable-by-configuration and needs no row.
-
-`bus/SoftwareReleaseListener` matches an announced release against the same two sources through the
-same merge function, and writes the version into **every env this store knows about** — an entry is a
-per-env override with no default row beneath it, so an env a release does not reach starts its
-containers on the image's committed default. One definition of what is pinned, so the pin mechanism
-and the pin report cannot disagree.
+This service no longer reports image versions: each launching service pins its images in its own
+pom and answers for them itself (`/workspaces/api/pins`, `/projects/api/pins`).
 
 The framework's own paths sit under `/configuration/q` — `/configuration/q/health/ready` is what the
 deployer's health gate curls, and `/configuration/q/openapi` is the document.
