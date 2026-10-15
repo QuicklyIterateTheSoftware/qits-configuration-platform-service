@@ -69,12 +69,12 @@
              address the builder container can actually reach — see docker/Dockerfile and
              .qits-maven-settings.xml. -->
         <qits.db-core.version>2026.1002.70617</qits.db-core.version>
-        <qits.auth-core.version>2026.1002.70617</qits.auth-core.version>
+        <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
         <qits.arch-rules.version>2026.1011.185745</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
              calls. Also published by qits-integrations-quarkus. -->
-        <qits.http-core.version>2026.1011.185745</qits.http-core.version>
+        <qits.http-core.version>2026.1013.64811</qits.http-core.version>
         <!-- The user-story framework (test scope everywhere): service/src/test/.../stories/ and
              api/TokenValidationBootstrapIT are written as @UserStory methods, so a `verify` with
              the ITs opted in also regenerates service/target/userstories/ — the catalogue's own
@@ -92,7 +92,7 @@
              declared, writes the released version into its own config store. The eventstream jar brings the outbox
              datasource, the durable-consumer tables and the catch-up sweeper; the payload is decoded
              into a local record (bus/SoftwareReleaseListener), so no qits-ci module is on the path. -->
-        <qits.eventstream.version>2026.1011.202648</qits.eventstream.version>
+        <qits.eventstream.version>2026.1014.223716</qits.eventstream.version>
         <!-- pact-jvm (qits-1149), both halves on one version, the one every provider on the estate
              verifies with: the consumer half writes pacts/qits-configuration-service_qits-idp-service.json
              (quarkus-oidc's discovery and JWKS reads of qits-idp), the provider half is
@@ -102,7 +102,7 @@
              answers it reads, both test scope, read by contracts/idp/IdpConsumerPactTest. Exact pins;
              they move like every internal pin: through a bump, never by hand. -->
         <qits.pact-consumer.version>2026.1010.141817</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1010.134259</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1012.180836</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
