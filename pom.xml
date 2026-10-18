@@ -102,7 +102,7 @@
              answers it reads, both test scope, read by contracts/idp/IdpConsumerPactTest. Exact pins;
              they move like every internal pin: through a bump, never by hand. -->
         <qits.pact-consumer.version>2026.1018.142240</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1012.180836</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1018.142635</qits.idp-golden-masters.version>
         <!-- THE CONSUMER PACTS ConsumerPactVerificationTest verifies (qits-1149): one jar per consumer
              that commits `pacts/<consumer>_qits-configuration-service.json`, test scope. Exact pins;
              qits-maintenance bumps each when its consumer releases a changed pact. -->
