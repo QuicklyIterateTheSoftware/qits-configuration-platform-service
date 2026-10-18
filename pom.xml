@@ -92,7 +92,7 @@
              declared, writes the released version into its own config store. The eventstream jar brings the outbox
              datasource, the durable-consumer tables and the catch-up sweeper; the payload is decoded
              into a local record (bus/SoftwareReleaseListener), so no qits-ci module is on the path. -->
-        <qits.eventstream.version>2026.1018.151251</qits.eventstream.version>
+        <qits.eventstream.version>2026.1018.170159</qits.eventstream.version>
         <!-- pact-jvm (qits-1149), both halves on one version, the one every provider on the estate
              verifies with: the consumer half writes pacts/qits-configuration-service_qits-idp-service.json
              (quarkus-oidc's discovery and JWKS reads of qits-idp), the provider half is
@@ -101,8 +101,8 @@
         <!-- The one golden-master reader (qits-integrations-quarkus-javalib) and qits-idp's recorded
              answers it reads, both test scope, read by contracts/idp/IdpConsumerPactTest. Exact pins;
              they move like every internal pin: through a bump, never by hand. -->
-        <qits.pact-consumer.version>2026.1018.142240</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1018.142635</qits.idp-golden-masters.version>
+        <qits.pact-consumer.version>2026.1018.164604</qits.pact-consumer.version>
+        <qits.idp-golden-masters.version>2026.1018.175524</qits.idp-golden-masters.version>
         <!-- THE CONSUMER PACTS ConsumerPactVerificationTest verifies (qits-1149): one jar per consumer
              that commits `pacts/<consumer>_qits-configuration-service.json`, test scope. Exact pins;
              qits-maintenance bumps each when its consumer releases a changed pact. -->
