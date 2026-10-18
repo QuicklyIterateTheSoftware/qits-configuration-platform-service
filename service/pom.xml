@@ -178,6 +178,14 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- The consumer pacts ConsumerPactVerificationTest verifies: each jar carries one
+                 `pacts/<consumer>_qits-configuration-service.json`, read off the classpath. The
+                 pinned jar IS the source of the pact; nothing is copied into this tree. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-deployments-service-pacts-qits-configuration-service</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- The store every @QuarkusTest here boots against, and the one PackagedSurfaceIT hands
                  to the launched process. testdb/EmbeddedPg + testdb/EmbeddedPgConfigSource hand the
                  running instance to Quarkus. -->
