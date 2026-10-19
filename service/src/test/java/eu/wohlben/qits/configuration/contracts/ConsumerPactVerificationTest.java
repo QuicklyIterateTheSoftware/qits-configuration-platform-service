@@ -32,8 +32,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * a changed pact. {@link ClasspathPactLoader} finds them all.
  *
  * <p><b>Pinned today:</b> qits-deployments-service's pact (its {@code ConfigHostExtrasSource} resolved
- * read and {@code ConfigHostDeclarationSeed} declaration POST). {@link ClasspathPactLoader#REQUIRED}
- * is true, so a classpath that lost its pinned pacts fails rather than verifying nothing.
+ * read and {@code ConfigHostDeclarationSeed} declaration POST), qits-bootstrap-cli's (the properties
+ * import), qits-orchestrator-service's (the retired-key entry collection) and
+ * qits-projects-service's (an application's entries in an environment). {@link
+ * ClasspathPactLoader#REQUIRED} is true, so a classpath that lost its pinned pacts fails rather
+ * than verifying nothing.
  *
  * <p>Each interaction runs against this {@code @QuarkusTest} application over real HTTP, as the
  * {@code %test} synthetic user — exactly as {@link GoldenMasterRecordingTest}'s calls run. Every

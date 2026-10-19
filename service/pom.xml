@@ -193,6 +193,21 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-bootstrap-cli-pacts-qits-configuration-service</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-orchestrator-service-pacts-qits-configuration-service</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-projects-service-pacts-qits-configuration-service</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- The store every @QuarkusTest here boots against, and the one PackagedSurfaceIT hands
                  to the launched process. testdb/EmbeddedPg + testdb/EmbeddedPgConfigSource hand the
                  running instance to Quarkus. -->

@@ -107,6 +107,9 @@
              that commits `pacts/<consumer>_qits-configuration-service.json`, test scope. Exact pins;
              qits-maintenance bumps each when its consumer releases a changed pact. -->
         <qits.deployments-service-pacts-qits-configuration-service.version>2026.1010.160720</qits.deployments-service-pacts-qits-configuration-service.version>
+        <qits.bootstrap-cli-pacts-qits-configuration-service.version>2026.1018.185226</qits.bootstrap-cli-pacts-qits-configuration-service.version>
+        <qits.orchestrator-service-pacts-qits-configuration-service.version>2026.1018.172917</qits.orchestrator-service-pacts-qits-configuration-service.version>
+        <qits.projects-service-pacts-qits-configuration-service.version>2026.1018.195756</qits.projects-service-pacts-qits-configuration-service.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -308,6 +311,21 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-deployments-service-pacts-qits-configuration-service</artifactId>
                 <version>${qits.deployments-service-pacts-qits-configuration-service.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-bootstrap-cli-pacts-qits-configuration-service</artifactId>
+                <version>${qits.bootstrap-cli-pacts-qits-configuration-service.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-orchestrator-service-pacts-qits-configuration-service</artifactId>
+                <version>${qits.orchestrator-service-pacts-qits-configuration-service.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-projects-service-pacts-qits-configuration-service</artifactId>
+                <version>${qits.projects-service-pacts-qits-configuration-service.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
