@@ -1,22 +1,42 @@
 package eu.wohlben.qits.configuration.bus;
 
+import eu.wohlben.qits.configuration.control.AdoptionRule;
 import eu.wohlben.qits.configuration.control.ConfigurationService;
 import eu.wohlben.qits.configuration.control.ImagePins;
-import eu.wohlben.qits.configuration.control.ImagePins.Pin;
-import eu.wohlben.qits.configuration.entity.ConfigurationEntry;
+import eu.wohlben.qits.configuration.control.ReleaseLedger;
+import eu.wohlben.qits.configuration.control.ReleaseLedger.Published;
 import eu.wohlben.qits.eventstream.QitsDurableEventListener;
 import eu.wohlben.qits.eventstream.control.CanonicalJson;
 import eu.wohlben.qits.eventstream.control.EventFrame;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.List;
 import java.util.Set;
 import org.jboss.logging.Logger;
 
 /**
  * The bus end of the platform's pins: consumes qits-ci's {@code SoftwareRelease} and, when the
  * released package is one an application asked to be told about, writes its version into this
- * service's own store as an env entry on that application.
+ * service's own store as an env entry on that application — <b>once that release is FINALIZED</b>.
+ *
+ * <h2>A release is recorded on arrival and adopted on finalization (qits-1472)</h2>
+ *
+ * <p>qits-ci announces {@code SoftwareRelease} once a green publish run and an {@code SCMRelease}
+ * exist for the same (repository, version): after RELEASED, and <b>before</b> the post-release gates
+ * qits-projects finalizes on (the publish run green, the deployment active). A RELEASED request ends
+ * either FINALIZED or OBSOLETE — the latter when a newer request folds its tag in — so a pin written on
+ * arrival named, for minutes and sometimes forever, a version that had not passed its deploy gate or
+ * whose request was abandoned. Both were measured on the live log in October 2026.
+ *
+ * <p>So this listener now only RECORDS the release in {@link ReleaseLedger}, and the pin moves through
+ * {@link AdoptionRule}: when the same repository has already been finalized at or above this version,
+ * at once; otherwise later, when {@link ReleaseFinalizedListener} consumes the finalization. Either
+ * arrival order adopts, a release never cleared is never applied, and a lower version never rewinds a
+ * pin a higher one already moved. Both doors make their write through {@link ReleaseAdopter}, which is
+ * where the pin write described below now lives, unchanged.
+ *
+ * <p><b>The repository is therefore a required field now</b>: it is the join key with the
+ * finalization ({@code SoftwareRelease.repository} is the same qits-projects row id {@code
+ * ReleaseRequestStateChanged.repoId} carries), and a release that names none could never be cleared.
  *
  * <p><b>THE MATCH HAS TWO HALVES AND THE FIRST ONE IS THE APPLICATIONS' OWN.</b> An application
  * declares its {@code packageVersion} keys in {@code .config/qits/configuration.yml}, naming the
@@ -87,15 +107,15 @@ import org.jboss.logging.Logger;
  * a fact this listener holds, and the image's own default answers it more conservatively in the
  * meantime. The next release of that package closes the gap by itself.
  *
- * <h2>Last-writer-wins, and why it is safe here</h2>
+ * <h2>Idempotent, and forward-only</h2>
  *
- * <p>The effect is an idempotent upsert keyed by the event's own fact — the released version — so it
- * needs none of the tip-checking a ladder does. {@link ConfigurationService#upsert} writes no
- * revision when the value is already what it would set, so a redelivery of the same release, live or
- * caught up, changes nothing. The one residual is a catch-up frame arriving after a newer live one
- * could momentarily rewrite an older version; the next release corrects it, and the platform's own
- * ordering makes it rare. Writing through {@code upsert} keeps the revision and audit trail exactly
- * as an operator's edit would.
+ * <p>The effect is an idempotent upsert keyed by the event's own fact — the released version. {@link
+ * ConfigurationService#upsert} writes no revision when the value is already what it would set, and a
+ * release already adopted is not applied again, so a redelivery of the same release, live or caught
+ * up, changes nothing. The residual this section used to accept — a catch-up frame arriving after a
+ * newer live one momentarily rewriting an older version — is closed: {@link AdoptionRule#wouldRewind}
+ * refuses to apply a version when the same package was already adopted at or above it. Writing
+ * through {@code upsert} keeps the revision and audit trail exactly as an operator's edit would.
  *
  * <p><b>It overwrites whatever class the row carries, operator rows included</b>, and that is the
  * decision rather than an oversight: a version pinned by hand holds until the next release of that
@@ -111,7 +131,7 @@ import org.jboss.logging.Logger;
  * stays owed for the next sweep.
  *
  * <p><b>Poison, and swallowed with a WARN:</b> a payload that will not parse, and one that names no
- * version. Neither can succeed on a later offer — the same bytes fail identically every time — and a
+ * package, no version or no repository. Neither can succeed on a later offer — the same bytes fail identically every time — and a
  * throw would hold this consumer's watermark behind one bad event forever.
  */
 @ApplicationScoped
@@ -139,19 +159,24 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
   /** The one event name this listener wants — {@code SoftwareRelease}'s signature. */
   static final String SOFTWARE_RELEASE = "SoftwareRelease";
 
-  /** Who the revision records as the writer, the way {@code ConfigurationController.actor()} does. */
+  /**
+   * Who the revision records as the writer, the way {@code ConfigurationController.actor()} does —
+   * whichever of the two listeners completed the adoption, because the version written is still this
+   * release's.
+   */
   static final String ACTOR = "qits-configuration/software-release-listener";
 
   /**
    * The {@code SoftwareRelease} payload wire fields this listener reads, as a local record bound by
-   * {@link CanonicalJson}. Only the four the match and the pin need — {@code occurredAt} is on the
+   * {@link CanonicalJson}. Only the four the match, the pin and the adoption need — {@code
+   * repository} is the join key with the finalization — {@code occurredAt} is on the
    * envelope, not the payload, so it is not here. Public so {@code bus/EventWireReflection} and the
    * test can name it; a copy of qits-ci's wire shape rather than a dependency on its module.
    */
   public record SoftwareReleasePayload(
       String repository, String version, String packageType, String packageName) {}
 
-  @Inject ConfigurationService configuration;
+  @Inject ReleaseAdopter adopter;
 
   @Override
   public String consumerId() {
@@ -183,7 +208,8 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
    *
    * <p>What it still answers no to is what it can decide from the bytes: an unreadable payload, one
    * naming no package, and one naming no version. Those are settled here rather than claimed and
-   * dropped, which keeps the ledger free of frames nothing could ever have been done with.
+   * dropped, which keeps the ledger free of frames nothing could ever have been done with. A release
+   * naming no repository joins them: it could never be cleared by a finalization.
    */
   @Override
   public boolean selects(EventFrame frame) {
@@ -191,8 +217,9 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
   }
 
   /**
-   * Writes the released version through the service's own write seam, so each entry carries a
-   * revision and an author.
+   * Records the release and, when its repository is already finalized at or above its version,
+   * writes its pins through the service's own write seam — see {@link ReleaseAdopter}, which both
+   * this listener and {@link ReleaseFinalizedListener} complete an adoption through.
    *
    * <p><b>NOTHING HERE TOUCHES THIS SERVICE'S STORE INSIDE THE CLAIM'S TRANSACTION, reads
    * included.</b> The funnel calls this method inside the transaction that writes the claim, and
@@ -200,24 +227,22 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
    * one, so a query of the configuration store from in here fails to enlist at all ({@code Exception
    * in association of connection to existing transaction}, measured by {@code ImageReleasePinIT} on
    * 2026-09-07: every frame failed, the claim rolled back, and the release stayed owed forever). The
-   * writes always suspended it — {@code DbRetry.inNewTx} — and the two reads the match now needs do
-   * the same, which is why they are methods on {@code ConfigurationService} rather than repository
-   * calls made here.
+   * writes always suspended it — {@code DbRetry.inNewTx} — and every read and record the adoption
+   * needs does the same, which is why they are methods on {@code ConfigurationService} and {@code
+   * ReleaseLedger} rather than repository calls made here.
    *
    * <p>The price of that suspension is the effect not being atomic with the claim: a crash between
    * two writes leaves some pins landed and the frame still owed, and the retry writes the rest. That
-   * is the shape this listener has always had, and the upsert being idempotent is what makes it a
-   * non-event.
+   * is the shape this listener has always had, and the upsert being idempotent — and the release
+   * being marked adopted only after its writes — is what makes it a non-event.
    *
    * <p><b>One frame is many writes</b>, and they are deliberately not one. Every (application, key)
    * the release moves, in every env this store knows about, is an independent config entry with a
-   * revision of its own. A write that throws is retryable and rolls the claim back, which re-offers
-   * the frame and repeats the earlier upserts — harmless, because an upsert that would set the value
-   * already there writes no revision.
+   * revision of its own.
    *
-   * <p><b>A frame that matches nothing is a no-op and says so at DEBUG.</b> It was claimed rather
-   * than skipped (see {@link #selects}), so this is the ordinary outcome for most releases on the
-   * platform and not a condition to report.
+   * <p><b>A frame that matches nothing is a no-op and says so at DEBUG</b>, once it is adopted. It
+   * was claimed rather than skipped (see {@link #selects}), so this is the ordinary outcome for most
+   * releases on the platform and not a condition to report.
    */
   @Override
   public void onFrame(EventFrame frame) {
@@ -227,45 +252,13 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
       // non-selecting frame the funnel never calls onFrame. Cheaper than an assertion.
       return;
     }
-    List<Pin> pins = pinsOf(released);
-    if (pins.isEmpty()) {
-      LOG.debugf(
-          "SoftwareRelease %s released %s %s, which nothing declares and nothing pins",
-          frame.id(), released.packageType(), released.packageName());
-      return;
-    }
-    List<String> envs = configuration.pinEnvs();
-    for (Pin pin : pins) {
-      for (String env : envs) {
-        ConfigurationEntry entry =
-            configuration.upsert(env, pin.application(), pin.key(), released.version(), ACTOR);
-        LOG.infof(
-            "SoftwareRelease %s pinned %s=%s (env %s, application %s, revision %d)",
-            frame.id(),
-            pin.key(),
+    adopter.published(
+        "SoftwareRelease " + frame.id(),
+        new Published(
+            released.repository(),
             released.version(),
-            env,
-            pin.application(),
-            entry.headRevision);
-      }
-    }
-  }
-
-  /**
-   * The pins this release moves: what the applications declared, and the authored residual for the
-   * pairs no declaration claims.
-   *
-   * <p>The authored half is consulted only for a {@code docker} release, because that is what those
-   * rows are versions of; the declared half needs no such gate, since the declaration named its own
-   * type and the query matched it.
-   */
-  private List<Pin> pinsOf(SoftwareReleasePayload released) {
-    List<Pin> authored =
-        ImagePins.DOCKER_TYPE.equals(released.packageType())
-            ? ImagePins.BY_IMAGE.getOrDefault(released.packageName(), List.of())
-            : List.of();
-    return ImagePins.merge(
-        configuration.declaredPins(released.packageType(), released.packageName()), authored);
+            released.packageType(),
+            released.packageName()));
   }
 
   /**
@@ -277,9 +270,9 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
    *
    * <p>Every null it returns is POISON rather than a condition: the same bytes decide identically on
    * every later offer, so answering "no" settles the frame instead of wedging the watermark behind
-   * it. The two that are worth a person's attention say so at WARN — qits-ci always sends a package
-   * and a version, so a release missing either is a contract failure upstream, whether or not this
-   * platform would have pinned it.
+   * it. Each says so at WARN — qits-ci always sends a package, a version and a repository, so a
+   * release missing any of them is a contract failure upstream, whether or not this platform would
+   * have pinned it.
    */
   private static SoftwareReleasePayload payloadOf(EventFrame frame) {
     SoftwareReleasePayload released;
@@ -300,6 +293,13 @@ public class SoftwareReleaseListener implements QitsDurableEventListener {
       LOG.warnf(
           "SoftwareRelease %s released %s %s but names no version; nothing to pin",
           frame.id(), released.packageType(), released.packageName());
+      return null;
+    }
+    if (blank(released.repository())) {
+      LOG.warnf(
+          "SoftwareRelease %s released %s %s %s but names no repository; no finalization can ever"
+              + " clear it",
+          frame.id(), released.packageType(), released.packageName(), released.version());
       return null;
     }
     return released;

@@ -293,7 +293,8 @@ Each of these is a decision, not an omission, and each has a place it would land
 - **Secret entries.** The `class` column exists for them and holds `plain` only. A secret is an
   in-memory, approval-gated, one-shot credential — never a value in this table.
 - **Change events.** This service SUBSCRIBES (`bus/SoftwareReleaseListener` consumes qits-ci's
-  `SoftwareRelease` off the durable bus) and publishes nothing: no `ConfigurationChanged`, no
+  `SoftwareRelease`, and `bus/ReleaseFinalizedListener` qits-projects' `ReleaseRequestStateChanged`,
+  off the durable bus — a pin moves only once its release is FINALIZED, qits-1472) and publishes nothing: no `ConfigurationChanged`, no
   announcement of a write. The deployer pulls per deployment, so nothing depends on a push. A
   publisher would arrive with the vocabulary jar every other announcing service has.
 - **OpenTelemetry export.** The siblings ship `quarkus-opentelemetry` with the four preview keys

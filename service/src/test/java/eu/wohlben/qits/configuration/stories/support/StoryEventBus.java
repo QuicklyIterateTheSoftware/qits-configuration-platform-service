@@ -1,5 +1,6 @@
 package eu.wohlben.qits.configuration.stories.support;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -10,15 +11,19 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A stand-in qits-events, and the <b>outgoing</b> tap that draws what the launched process read from
@@ -52,8 +57,10 @@ import java.util.Optional;
  *       database is in, and the only one that lets a story arm a release afterwards and have it
  *       delivered.
  *   <li><b>the next page after a cursor</b> ({@code ?order=asc&limit=200&name=…}). Armed or not,
- *       this is the request the sweep repeats; it carries the armed page exactly when there is no
- *       {@code cursor} parameter yet, i.e. until the consumer has read past the release. After that
+ *       this is the request the sweep repeats; it carries the armed page — cut down to the frames
+ *       of the {@code name} it asked for, one consumer per signature — exactly when there is no
+ *       {@code cursor} parameter yet and that cut is not empty, i.e. until the consumer has read past
+ *       its frames. After that
  *       the watermark supplies a cursor and every later sweep gets an empty page, which is why one
  *       arming is delivered exactly once.
  * </ul>
@@ -81,8 +88,11 @@ public final class StoryEventBus {
   /** The list route under {@code qits.events.url}, which is a bare scheme + host + port. */
   public static final String EVENTS_PATH = "/events/api/events";
 
-  /** The signature this service's durable listener subscribes to. */
+  /** The signature this service's release listener subscribes to. */
   public static final String SOFTWARE_RELEASE = "SoftwareRelease";
+
+  /** The signature the finalization listener subscribes to (qits-1472). */
+  public static final String RELEASE_REQUEST_STATE_CHANGED = "ReleaseRequestStateChanged";
 
   /**
    * The label a carried poll renders as. {@code order}, {@code limit} and {@code name} are all
@@ -91,8 +101,17 @@ public final class StoryEventBus {
    * not move between runs. The cursor-carrying spelling never reaches a label, because a poll that
    * has a cursor is a poll that carried nothing.
    */
-  public static final String CATCHUP_LABEL =
-      "GET " + EVENTS_PATH + "?order=asc&limit=200&name=" + SOFTWARE_RELEASE + " -> 200";
+  public static final String CATCHUP_LABEL = catchupLabel(SOFTWARE_RELEASE);
+
+  /**
+   * The finalization listener's carried poll (qits-1472): the second durable consumer, so the second
+   * arrow to qits-events, labelled by its own one signature.
+   */
+  public static final String FINALIZED_CATCHUP_LABEL = catchupLabel(RELEASE_REQUEST_STATE_CHANGED);
+
+  private static String catchupLabel(String signature) {
+    return "GET " + EVENTS_PATH + "?order=asc&limit=200&name=" + signature + " -> 200";
+  }
 
   private static final String PORT_PROPERTY = "qits.test.story-event-bus.port";
 
@@ -160,7 +179,7 @@ public final class StoryEventBus {
     if (EVENTS_PATH.equals(path)) {
       status = 200;
       if (query != null && query.contains("order=asc") && !query.contains("cursor=")) {
-        String armed = armedPage();
+        String armed = pageFor(armedPage(), names(query));
         if (armed != null) {
           body = armed;
           carried = true;
@@ -176,6 +195,54 @@ public final class StoryEventBus {
     try (OutputStream out = exchange.getResponseBody()) {
       out.write(bytes);
     }
+  }
+
+  /**
+   * The armed page cut down to the names the poll asked for, or null when none of its frames is one
+   * of them.
+   *
+   * <p><b>Filtered by name since there are two consumers</b> (qits-1472), which is what the real log
+   * does: each durable listener pages its own signature from its own watermark. Answering every
+   * consumer with every frame would hand a release to the finalization listener and the reverse, and
+   * would let a consumer whose frames are not armed yet take a cursor past them — the stub's whole
+   * delivery rule is "carried until the first cursor".
+   */
+  private static String pageFor(String armed, Set<String> names) {
+    if (armed == null) {
+      return null;
+    }
+    try {
+      Map<String, Object> page = MAPPER.readValue(armed, new TypeReference<>() {});
+      @SuppressWarnings("unchecked")
+      List<Map<String, Object>> events = (List<Map<String, Object>>) page.get("events");
+      List<Map<String, Object>> wanted =
+          events.stream()
+              .filter(event -> names.isEmpty() || names.contains(String.valueOf(event.get("name"))))
+              .toList();
+      if (wanted.isEmpty()) {
+        return null;
+      }
+      page.put("events", wanted);
+      return MAPPER.writeValueAsString(page);
+    } catch (IOException unreadable) {
+      return null;
+    }
+  }
+
+  /** Every {@code name} the query asks for, repeated or comma-joined. */
+  private static Set<String> names(String query) {
+    Set<String> names = new LinkedHashSet<>();
+    for (String parameter : query.split("&")) {
+      if (parameter.startsWith("name=")) {
+        String value = URLDecoder.decode(parameter.substring(5), StandardCharsets.UTF_8);
+        for (String name : value.split(",")) {
+          if (!name.isBlank()) {
+            names.add(name.trim());
+          }
+        }
+      }
+    }
+    return names;
   }
 
   private static String uri(String path, String query) {
@@ -231,6 +298,65 @@ public final class StoryEventBus {
     frame.put("parentId", null);
     frame.put("environment", "platform");
     return frame;
+  }
+
+  /**
+   * One {@code ReleaseRequestStateChanged} at {@code FINALIZED}, as qits-projects publishes it: the
+   * green light a recorded release waits on before it moves a pin (qits-1472). {@code repoId} is the
+   * same value a {@code SoftwareRelease} carries as {@code repository} — the join key.
+   */
+  public static Map<String, Object> releaseRequestFinalized(
+      String id, String occurredAt, String repoId, String version) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("backingBranch", "release-request/" + repoId + "-rr-1");
+    payload.put("changedAt", occurredAt);
+    payload.put("previousState", "RELEASED");
+    payload.put("releaseRequestId", id);
+    payload.put("releaseRequestQualifiedId", repoId + "-rr-1");
+    payload.put("repoId", repoId);
+    payload.put("repoName", repoId);
+    payload.put("state", "FINALIZED");
+    payload.put("version", version);
+    Map<String, Object> frame = new LinkedHashMap<>();
+    frame.put("id", id);
+    frame.put("name", RELEASE_REQUEST_STATE_CHANGED);
+    frame.put("occurredAt", occurredAt);
+    frame.put("payload", json(payload));
+    frame.put("description", repoId + "-rr-1 FINALIZED at " + version);
+    frame.put("parentId", null);
+    frame.put("environment", "platform");
+    return frame;
+  }
+
+  /**
+   * Wait until the consumer of {@code signature} has been handed an armed page AND has read past it
+   * — a later poll of the same name carries a cursor, which it only has once the page's frames were
+   * offered to its listener. That is what lets a story assert the ABSENCE of an effect without a
+   * race.
+   */
+  public static void awaitConsumed(String signature, Duration patience) {
+    long deadline = System.nanoTime() + patience.toNanos();
+    while (System.nanoTime() < deadline) {
+      boolean carried = false;
+      for (String line : allLines()) {
+        if (!line.contains("name=" + signature)) {
+          continue;
+        }
+        if (line.endsWith(" carried")) {
+          carried = true;
+        } else if (carried && line.contains("cursor=")) {
+          return;
+        }
+      }
+      try {
+        Thread.sleep(250);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+    throw new AssertionError(
+        "the " + signature + " consumer never read past the armed page within " + patience);
   }
 
   private static String json(Object value) {

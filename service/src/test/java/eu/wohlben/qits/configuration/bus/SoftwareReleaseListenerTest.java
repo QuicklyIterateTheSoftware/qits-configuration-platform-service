@@ -45,8 +45,11 @@ class SoftwareReleaseListenerTest {
 
   private static final String VERSION = "2026.822.101500";
 
+  /** The repository every frame here names — the join key with a finalization (qits-1472). */
+  static final String REPOSITORY = "qits-projects";
+
   /** One {@code upsert} as the seam received it. */
-  private record Write(String env, String application, String key, String value, String actor) {}
+  record Write(String env, String application, String key, String value, String actor) {}
 
   /**
    * A {@link ConfigurationService} that writes nothing, answers the declared half from a canned map,
@@ -55,7 +58,7 @@ class SoftwareReleaseListenerTest {
    * <p>Every call, not the last one: one release is a write per (application, key) per env, and a
    * stand-in holding only the newest would let a listener that wrote one of them pass.
    */
-  private static final class CapturingService extends ConfigurationService {
+  static final class CapturingService extends ConfigurationService {
 
     final List<Write> writes = new ArrayList<>();
 
@@ -116,7 +119,7 @@ class SoftwareReleaseListenerTest {
 
   private static EventFrame frameFor(String packageType, String packageName, String version) {
     return frameCarrying(
-        "{\"repository\":\"qits-projects\",\"version\":"
+        "{\"repository\":\"" + REPOSITORY + "\",\"version\":"
             + json(version)
             + ",\"packageType\":"
             + json(packageType)
@@ -134,10 +137,28 @@ class SoftwareReleaseListenerTest {
     return value == null ? "null" : "\"" + value + "\"";
   }
 
+  /**
+   * A listener whose releases are ALREADY CLEARED: the ledger holds a finalization of {@link
+   * #REPOSITORY} at {@link #VERSION}, so every frame below is adopted on arrival — the
+   * finalized-first order (qits-1472). That keeps this class about the MATCH, which is unchanged;
+   * the gate itself, both arrival orders included, is {@code ReleaseAdoptionTest}'s.
+   */
   private SoftwareReleaseListener listenerWith(CapturingService service) {
+    return listenerWith(service, new InMemoryReleaseLedger().finalizing(REPOSITORY, VERSION));
+  }
+
+  static SoftwareReleaseListener listenerWith(
+      CapturingService service, InMemoryReleaseLedger ledger) {
     SoftwareReleaseListener listener = new SoftwareReleaseListener();
-    listener.configuration = service;
+    listener.adopter = adopterWith(service, ledger);
     return listener;
+  }
+
+  static ReleaseAdopter adopterWith(CapturingService service, InMemoryReleaseLedger ledger) {
+    ReleaseAdopter adopter = new ReleaseAdopter();
+    adopter.configuration = service;
+    adopter.ledger = ledger;
+    return adopter;
   }
 
   // ------------------------------------------------------------ the declared half
@@ -479,6 +500,25 @@ class SoftwareReleaseListenerTest {
     EventFrame frame = frameFor("docker", null, VERSION);
 
     assertFalse(listener.selects(frame), "there is nothing to match a declaration against");
+    listener.onFrame(frame);
+
+    assertEquals(List.of(), service.writes);
+  }
+
+  /**
+   * A release naming no repository can never be cleared — the repository is the join key with the
+   * finalization (qits-1472) — so it is poison like a missing version: settled, at WARN.
+   */
+  @Test
+  void aReleaseNamingNoRepositoryIsSettledRatherThanClaimed() {
+    CapturingService service =
+        new CapturingService().declaring("docker", "qits/stt", "qits-stt", "env.QITS_STT_VERSION");
+    SoftwareReleaseListener listener = listenerWith(service);
+    EventFrame frame =
+        frameCarrying(
+            "{\"version\":\"" + VERSION + "\",\"packageType\":\"docker\",\"packageName\":\"qits/stt\"}");
+
+    assertFalse(listener.selects(frame), "no finalization could ever clear it");
     listener.onFrame(frame);
 
     assertEquals(List.of(), service.writes);

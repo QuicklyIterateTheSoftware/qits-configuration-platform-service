@@ -18,7 +18,7 @@
           "qits-via": {
             "artifact": "eu.wohlben.qits:qits-eventstream",
             "repository": "qits-eventstream-javalib",
-            "version": "2026.1018.170159"
+            "version": "2026.1019.123026"
           }
         }
       },
@@ -85,12 +85,84 @@
           "qits-trigger": {
             "app": "qits-configuration-service",
             "kind": "schedule",
+            "schedule": "CatchupSweeper.catchUp(configuration.release-finalized)"
+          },
+          "qits-via": {
+            "artifact": "eu.wohlben.qits:qits-eventstream",
+            "repository": "qits-eventstream-javalib",
+            "version": "2026.1019.123026"
+          }
+        }
+      },
+      "description": "CatchupSweeper.catchUp(configuration.release-finalized): listEvents (one name)",
+      "key": "31c25fc3",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no events"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/events/api/events",
+        "query": {
+          "limit": [
+            "200"
+          ],
+          "name": [
+            "ReleaseRequestStateChanged"
+          ],
+          "order": [
+            "asc"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "events": []
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "references": {
+          "qits-call": {
+            "app": "qits-events-service",
+            "operationId": "listEvents"
+          },
+          "qits-trigger": {
+            "app": "qits-configuration-service",
+            "kind": "schedule",
             "schedule": "CatchupSweeper.initialize(configuration.project-agent-image)"
           },
           "qits-via": {
             "artifact": "eu.wohlben.qits:qits-eventstream",
             "repository": "qits-eventstream-javalib",
-            "version": "2026.1018.170159"
+            "version": "2026.1019.123026"
           }
         }
       },
@@ -111,6 +183,75 @@
           ],
           "name": [
             "SoftwareRelease"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "events": []
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "references": {
+          "qits-call": {
+            "app": "qits-events-service",
+            "operationId": "listEvents"
+          },
+          "qits-trigger": {
+            "app": "qits-configuration-service",
+            "kind": "schedule",
+            "schedule": "CatchupSweeper.initialize(configuration.release-finalized)"
+          },
+          "qits-via": {
+            "artifact": "eu.wohlben.qits:qits-eventstream",
+            "repository": "qits-eventstream-javalib",
+            "version": "2026.1019.123026"
+          }
+        }
+      },
+      "description": "CatchupSweeper.initialize(configuration.release-finalized): listEvents (one name)",
+      "key": "38120c73",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no events"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/events/api/events",
+        "query": {
+          "limit": [
+            "1"
+          ],
+          "name": [
+            "ReleaseRequestStateChanged"
           ]
         }
       },

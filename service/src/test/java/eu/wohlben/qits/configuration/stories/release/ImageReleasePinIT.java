@@ -72,6 +72,14 @@ import org.junit.jupiter.api.TestMethodOrder;
  * tag that does not exist. It is ordered <b>before</b> the docker frame on purpose — when the pin
  * appears, the frame before it has provably been offered and skipped.
  *
+ * <p><b>A release moves a pin only once it is FINALIZED (qits-1472)</b>, and the story shows both
+ * halves. The {@code SoftwareRelease} frames arrive first and are consumed — the story waits until the
+ * listener has read past them — and the declared key is still unwritten: an announced release is
+ * after RELEASED but before the post-release gates, and a RELEASED request can still go OBSOLETE.
+ * Only when qits-projects' {@code ReleaseRequestStateChanged} at {@code FINALIZED} arrives for the
+ * same repository and version does the pin move. That is a second durable consumer, so a second
+ * arrow to qits-events.
+ *
  * <p><b>The direction of the arrow is the point.</b> Nothing pushes into this service: the listener
  * is durable, so the catch-up sweep <i>pulls</i> the log forward from its own watermark — which is
  * what makes a release survive this service being down, restarted or replaced while it happened.
@@ -247,6 +255,12 @@ public class ImageReleasePinIT {
       releases that used to rewrite them must not. Pulling rather than being pushed is what makes
       this survive: a release announced while this service was restarting is still read back the next
       time it sweeps.
+
+      An announced release is not yet one the platform may use. qits-ci announces it after the
+      release request is RELEASED but before its post-release gates — the publish run green, the
+      deployment active — and a RELEASED request can still be made obsolete by a newer one. So the
+      release is recorded and the pin waits: only when qits-projects announces the request FINALIZED
+      for the same repository and version does the version reach the store.
       """)
   @UserflowRunsAfter({
     TokenValidationBootstrapIT.class,
@@ -334,6 +348,32 @@ public class ImageReleasePinIT {
     story
         .note("qits-ci announces five releases: four docker images and one jar of the same repository — and only one of them is pinned by anything")
         .as("releases-announced");
+
+    // RECORDED, NOT PINNED (qits-1472). The release listener has read past every frame above — a
+    // later poll of its signature carries a cursor — and the declared key is still unwritten: the
+    // release is RELEASED, not FINALIZED, and an announced version is not yet one the platform may
+    // use.
+    StoryEventBus.awaitConsumed(StoryEventBus.SOFTWARE_RELEASE, PATIENCE);
+    assertNull(
+        pinOf(DECLARING, DECLARED_IMAGE_KEY),
+        "a release that is announced but not finalized must not move a pin");
+    story
+        .note("the releases are read and recorded, and nothing is pinned yet: an announced release has not passed its post-release gates")
+        .as("release-recorded-not-pinned");
+
+    // THE GREEN LIGHT: qits-projects finalizes the request that released the declared image. The
+    // join key is (repository, version) — repoId here is what SoftwareRelease carried as
+    // repository — so this clears that release and nothing of any other repository.
+    StoryEventBus.arm(
+        List.of(
+            StoryEventBus.releaseRequestFinalized(
+                "finalize-story-declared-release",
+                "2026-08-29T11:40:00Z",
+                DECLARING,
+                DECLARED_VERSION)));
+    story
+        .note("qits-projects announces the release request finalized: its publish is green and its deployment active")
+        .as("release-finalized");
 
     // THE HALF THIS SERVICE WAS NEVER TOLD ABOUT, and since 2026-09-17 the only half there is.
     // Nothing in control/ImagePins names qits/story-declared — nothing in it names anything — so the
@@ -483,8 +523,12 @@ public class ImageReleasePinIT {
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "declared-image-pinned");
     ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "pin-attributed");
 
-    // THE ONE OUTGOING ARROW. This service pages the platform's event log forward from its own
-    // watermark; it is not called by qits-ci and it calls qits-ci about nothing.
+    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "release-recorded-not-pinned");
+    ReportAssertions.assertStepId(CATEGORY, PINNED_SLUG, "release-finalized");
+
+    // THE OUTGOING ARROWS, one per durable consumer. This service pages the platform's event log
+    // forward from its own watermarks; it is not called by qits-ci or qits-projects and it calls
+    // neither about anything.
     ReportAssertions.assertEdge(
         CATEGORY,
         PINNED_SLUG,
@@ -492,6 +536,13 @@ public class ImageReleasePinIT {
         StoryTarget.SERVICE,
         StoryEventBus.SERVICE_NAME,
         StoryEventBus.CATCHUP_LABEL);
+    ReportAssertions.assertEdge(
+        CATEGORY,
+        PINNED_SLUG,
+        NetworkEdge.HTTP,
+        StoryTarget.SERVICE,
+        StoryEventBus.SERVICE_NAME,
+        StoryEventBus.FINALIZED_CATCHUP_LABEL);
     ReportAssertions.assertEdge(
         CATEGORY,
         PINNED_SLUG,
@@ -529,13 +580,13 @@ public class ImageReleasePinIT {
         PIPELINE,
         StoryTarget.SERVICE,
         "POST " + StoryTarget.declarationPath(DECLARING, DECLARED_TAG) + " -> 201");
-    // Six arrows and no seventh, however many times the story polled: the resolved read of each of
+    // Seven arrows and no eighth, however many times the story polled: the resolved read of each of
     // the three applications it asks about — one it waited on for a pin, two it checks for the
-    // absence of one — the history it checked, the declaration the pipeline published, and the one
-    // page of the log that carried the releases. Two actors, because a declaration is a machine's
+    // absence of one — the history it checked, the declaration the pipeline published, the page of
+    // the log that carried the releases, and the page that carried their finalization. Two actors, because a declaration is a machine's
     // assertion about a build and a resolved read is the deployer's — no person is on this path at
     // all.
-    ReportAssertions.assertEdgeCount(CATEGORY, PINNED_SLUG, 6);
+    ReportAssertions.assertEdgeCount(CATEGORY, PINNED_SLUG, 7);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY, PINNED_SLUG, List.of(DEPLOYER, PIPELINE, StoryTarget.SERVICE));
     ReportAssertions.assertNotLeaked(CATEGORY, PINNED_SLUG, deployerBearer);

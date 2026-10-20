@@ -161,6 +161,15 @@ function, and writes the version into **every env this store knows about** — a
 override with no default row beneath it, so an env a release does not reach starts its containers on
 the image's committed default.
 
+**A release moves a pin only once it is FINALIZED** (qits-1472). `SoftwareRelease` arrives after
+the release request is RELEASED and before its post-release gates, and a RELEASED request can still
+go OBSOLETE. So the listener only records the release (`configuration_release_published`), and
+`bus/ReleaseFinalizedListener` — consumer `configuration.release-finalized` of qits-projects'
+`ReleaseRequestStateChanged` — records each `FINALIZED` (`configuration_release_finalized`). The
+pin moves on whichever arrives second: an artifact of repository R at version v is adopted once R is
+finalized at some V ≥ v (`control/VersionOrder`), only the highest cleared version per package is
+applied, and a pin never moves backwards (`control/AdoptionRule`).
+
 This service no longer reports image versions: each launching service pins its images in its own
 pom and answers for them itself (`/workspaces/api/pins`, `/projects/api/pins`).
 

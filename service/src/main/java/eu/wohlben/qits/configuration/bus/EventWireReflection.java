@@ -23,15 +23,20 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  *   <li>{@code EventPage} — one page of {@code GET /events/api/events}, by string name because it is
  *       package-private in the library. Without it the stream works in the binary and <b>catch-up
  *       alone</b> fails — the half that only matters after a cutover.
- *   <li>{@link SoftwareReleaseListener.SoftwareReleasePayload} — the payload this component reads out
- *       of the frame.
+ *   <li>{@link SoftwareReleaseListener.SoftwareReleasePayload} and {@link
+ *       ReleaseFinalizedListener.ReleaseRequestStateChangedPayload} — the payloads this component
+ *       reads out of the frames (the second since qits-1472, which gates a pin on finalization).
  *   <li>The {@code CanonicalJson$QitsEventMixin}, by string name because it is a nested type inside
  *       the library — the mix-in that keeps {@code eventId} out of the payload, so its absence is a
  *       payload silently gaining a field the contract omits.
  * </ul>
  */
 @RegisterForReflection(
-    targets = {EventFrame.class, SoftwareReleaseListener.SoftwareReleasePayload.class},
+    targets = {
+      EventFrame.class,
+      SoftwareReleaseListener.SoftwareReleasePayload.class,
+      ReleaseFinalizedListener.ReleaseRequestStateChangedPayload.class
+    },
     classNames = {
       "eu.wohlben.qits.eventstream.control.EventPage",
       "eu.wohlben.qits.eventstream.control.CanonicalJson$QitsEventMixin"
