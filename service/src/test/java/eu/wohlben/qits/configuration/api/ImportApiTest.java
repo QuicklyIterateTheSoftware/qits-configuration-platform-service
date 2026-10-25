@@ -75,6 +75,25 @@ class ImportApiTest {
         .body("revisions.size()", equalTo(2));
   }
 
+  /**
+   * {@code qits:desk} is admitted everywhere {@code qits:admin-agent} is (qits-1596): the import has
+   * no project concept to bind against — the file names its own applications, one per line — so the
+   * desk is admitted outright.
+   */
+  @Test
+  void aDeskAloneCanImport() {
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .contentType(ContentType.TEXT)
+        .body("qits.platform.deployments.extras.imp-desk.env.QITS_A=one\n")
+        .when()
+        .post(IMPORT)
+        .then()
+        .statusCode(200)
+        .body("imported", equalTo(1));
+  }
+
   @Test
   void aLineCarryingThePrefixAndNothingUsableIs400() {
     given()

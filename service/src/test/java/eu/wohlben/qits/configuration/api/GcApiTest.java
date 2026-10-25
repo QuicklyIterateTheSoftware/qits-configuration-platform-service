@@ -135,6 +135,28 @@ class GcApiTest {
         .statusCode(403);
   }
 
+  /**
+   * {@code qits:desk} is admitted everywhere {@code qits:admin-agent} is (qits-1596): the delivery
+   * desk, holding ONLY that role and a {@code project} claim, passes this write door exactly as the
+   * coordinator does. This door has no project concept to bind against — the pins it judges are
+   * read from qits-deployments, not scoped to any one project — so the desk is admitted outright
+   * rather than bound.
+   */
+  @Test
+  void aDeskAloneIsAdmitted() {
+    Map<String, Object> harmless = Map.of("dryRun", true, "deployments", Map.of("pins", List.of()));
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .contentType(ContentType.JSON)
+        .body(harmless)
+        .when()
+        .post(GC)
+        .then()
+        .statusCode(200)
+        .body("dryRun", equalTo(true));
+  }
+
   @Test
   void missingPinsAre400AndDeleteNothing() {
     put("gc-api-refused", "env.QITS_OLD", "x");

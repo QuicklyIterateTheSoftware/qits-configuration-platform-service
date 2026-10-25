@@ -265,6 +265,36 @@ class ConfigurationApiTest {
         .statusCode(404);
   }
 
+  /**
+   * {@code qits:desk} is admitted everywhere {@code qits:admin-agent} is (qits-1596): the delivery
+   * desk, holding ONLY that role and a {@code project} claim, writes and reads exactly as the
+   * coordinator does. There is no project concept on this door — {@code application} is a plain
+   * column with no FK to any catalogue entry — so the desk is admitted outright rather than bound
+   * to its token's {@code project} claim.
+   */
+  @Test
+  void aDeskAloneCanWriteAndRead() {
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .contentType(ContentType.JSON)
+        .body(new ConfigurationController.SetEntryRequest("one"))
+        .when()
+        .put(BASE + "/applications/api-desk/envs/" + ENV + "/entries/env.QITS_DESK")
+        .then()
+        .statusCode(201);
+
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .when()
+        .get(BASE + "/applications/api-desk/envs/" + ENV + "/entries")
+        .then()
+        .statusCode(200)
+        .body("entries.size()", equalTo(1))
+        .body("entries[0].value", equalTo("one"));
+  }
+
   @Test
   void aRefusedEnvNameIs400AndTheMessageNamesIt() {
     given()

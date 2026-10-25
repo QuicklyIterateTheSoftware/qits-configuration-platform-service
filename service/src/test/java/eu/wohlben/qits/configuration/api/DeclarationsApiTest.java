@@ -175,6 +175,35 @@ class DeclarationsApiTest {
             equalTo("qits/workspace"));
   }
 
+  /**
+   * {@code qits:desk} is admitted everywhere {@code qits:admin-agent} is (qits-1596) on the reads
+   * this controller keeps paired — not on the two system-only writes above, which never admitted
+   * {@code qits:admin-agent} either and stay machine-only: an asserted fact about a build, which the
+   * desk has no more business hand-posting than a person does.
+   */
+  @Test
+  void aDeskAloneCanReadDeclarations() {
+    post("decl-desk", "1.0", "environment", "keys: {}\n").then().statusCode(201);
+
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .when()
+        .get(declarations("decl-desk"))
+        .then()
+        .statusCode(200)
+        .body("declarations.size()", equalTo(1));
+
+    given()
+        .header("X-Qits-User", "dyn-desk")
+        .header("X-Qits-Roles", "qits:desk")
+        .when()
+        .get(declarations("decl-desk") + "/1.0")
+        .then()
+        .statusCode(200)
+        .body("application", equalTo("decl-desk"));
+  }
+
   @Test
   void anUnknownDeclarationIs404WithAMessage() {
     given()
