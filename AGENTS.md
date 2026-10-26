@@ -153,6 +153,11 @@ follow-up)** — it is the role an ADMIN workspace's own coding-agent container 
 explicitly beside `qits:admin` at every one of those checks rather than inferred, so that a
 specific door can have it removed later without touching the others.
 
+**`qits:desk-admin` is admitted everywhere `qits:admin-agent` is (qits-1621)** — the delivery
+desk's admin grant, stated explicitly beside `qits:admin-agent` at every one of those checks.
+`DeskAdminParityTest` (ArchUnit, `eu.wohlben.qits.archrules.DeskAdminParityRules`) pins this with
+an empty refusal set.
+
 **The exception is `api/DeclarationsController`'s POST and DELETE**, which take `qits:system` alone
 AND call `machineAuth.require()` — the injected bean, an instance method, the shape
 qits-platform-deployments' `PdServiceController` established. The distinction is not that a

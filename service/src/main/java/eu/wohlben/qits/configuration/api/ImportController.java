@@ -71,7 +71,7 @@ public class ImportController {
       description =
           "The env is absent or not a valid name, or a line carries the extras prefix and a key"
               + " or application this service refuses")
-  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk", "qits:system"})
+  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk-admin", "qits:desk", "qits:system"})
   public ImportSummaryDto importProperties(@QueryParam("env") String env, String body) {
     return configuration.importProperties(ConfigurationKeys.requireEnv(env), body, actor());
   }

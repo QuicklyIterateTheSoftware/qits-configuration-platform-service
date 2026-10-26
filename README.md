@@ -112,7 +112,8 @@ can honestly make. Every `GET` also accepts `qits:agent`, the role an agent hold
 no anonymous route.
 
 `qits:admin-agent` — an ADMIN workspace's own coding-agent container — is admitted everywhere
-`qits:admin` is, for now (qits-628 follow-up).
+`qits:admin` is, for now (qits-628 follow-up). `qits:desk-admin` — the delivery desk's admin
+grant — is admitted everywhere `qits:admin-agent` is (qits-1621).
 
 | route | what it answers |
 | --- | --- |
