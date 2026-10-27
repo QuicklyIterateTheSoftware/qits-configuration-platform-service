@@ -92,7 +92,7 @@
              declared, writes the released version into its own config store. The eventstream jar brings the outbox
              datasource, the durable-consumer tables and the catch-up sweeper; the payload is decoded
              into a local record (bus/SoftwareReleaseListener), so no qits-ci module is on the path. -->
-        <qits.eventstream.version>2026.1019.123026</qits.eventstream.version>
+        <qits.eventstream.version>2026.1027.101950</qits.eventstream.version>
         <!-- pact-jvm (qits-1149), both halves on one version, the one every provider on the estate
              verifies with: the consumer half writes pacts/qits-configuration-service_qits-idp-service.json
              (quarkus-oidc's discovery and JWKS reads of qits-idp), the provider half is
