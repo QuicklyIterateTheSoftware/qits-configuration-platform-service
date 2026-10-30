@@ -18,10 +18,10 @@ contracts:
     qits-events-service: { packages: [maven] }
 userflows: qits-configuration
 
-# TWO FLAGS OUTSIDE THE RECIPE'S ALLOW-LIST: `-Dtest=SKIPNONE -Dsurefire.failIfNoSpecifiedTests=false`,
-# which keep the UNIT suites out of the story run. The recipe composes `-Dit.test` from
-# `.config/qits/userflow-stories` and passes nothing else, and a story selection alone would drag
-# every surefire suite along with it here. Everything else in this slot IS the recipe's, verbatim.
+# THE STORY STEP RUNS THE UNIT SUITES TOO (qits-1754), as qits-mirror-service's does: until then
+# `-Dtest=SKIPNONE` kept every surefire suite out, so ConsumerPactVerificationTest,
+# ProviderStateCoverageTest and the arch rules never gated a release here. Everything else in this
+# slot IS the recipe's, verbatim.
 release-request:
   - image: qits/build-images/node-docker-base:latest
     build: true
@@ -77,7 +77,6 @@ release-request:
       ./mvnw -B -ntp -s .qits-maven-settings.xml verify \
         -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL" \
         -Dquarkus.quinoa=false \
-        -Dtest=SKIPNONE -Dsurefire.failIfNoSpecifiedTests=false \
         -DskipITs=false \
         "-Dit.test=TokenValidationBootstrapIT,ConfigurationImportIT,DeploymentConfigurationIT,OperatorEditIT,AccessRefusalIT,ImageReleasePinIT"
       stories_dir=$(find . -maxdepth 3 -type d -path '*/target/userstories' | head -1)
