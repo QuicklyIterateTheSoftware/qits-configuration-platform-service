@@ -1,0 +1,4 @@
+# This repository's qits configuration. `repository.archived` was written by the platform's archive action (qits-1784).
+version: 1
+repository:
+  archived: true
